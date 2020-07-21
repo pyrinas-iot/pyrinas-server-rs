@@ -1,0 +1,6 @@
+/target
+Cargo.lock
+.env
+*.crt
+*.key
+*.db
