@@ -56,7 +56,7 @@ fn main() {
   });
 
   let socket = dotenv::var("PYRINAS_SOCKET_PATH").unwrap_or_else(|_| {
-    error!("ADMIN_SOCKET_PATH must be set in environment!");
+    error!("PYRINAS_SOCKET_PATH must be set in environment!");
     std::process::exit(1);
   });
 
@@ -98,6 +98,8 @@ fn main() {
     error!("Unable to create AWS credentials! {}", e);
     std::process::exit(1);
   });
+
+  // Create bucket
   let bucket = Bucket::new(&aws_bucket, region, credentials).expect("Unable to create bucket!");
 
   // Connect to unix socket
@@ -123,7 +125,7 @@ fn main() {
       let filename = path.file_name().unwrap().to_str().unwrap();
 
       // Create the target file name
-      let server_filename = format!("/{}_{}_{}", s.uid, timestamp, filename);
+      let server_filename = format!("{}_{}_{}", s.uid, timestamp, filename);
 
       // Open the file
       let mut file = File::open(path).expect("Unable to open file!");
@@ -143,7 +145,6 @@ fn main() {
         });
 
       assert_eq!(200, status_code);
-      println!("Status code: {}", status_code);
 
       // TODO: this can be used in the server..
       // let url = bucket.presign_put(filename, 180).unwrap_or_else(|e| {

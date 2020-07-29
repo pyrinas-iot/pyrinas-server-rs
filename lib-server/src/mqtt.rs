@@ -1,4 +1,4 @@
-use futures::{executor::block_on, stream::StreamExt};
+use async_std::{prelude::*, task};
 use paho_mqtt as mqtt;
 use std::{process, time::Duration};
 
@@ -163,7 +163,7 @@ impl MQTTCloud {
       .user_name("test")
       .finalize();
 
-    if let Err(err) = block_on(async {
+    if let Err(err) = task::block_on(async {
       // Get message stream before connecting.
       let mut strm = self.client.get_stream(25);
 

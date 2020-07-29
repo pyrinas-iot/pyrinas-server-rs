@@ -26,9 +26,6 @@ pub struct NewOta {
     pub package: OTAPackage,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SharedConfig {}
-
 #[cfg(test)]
 mod tests {
     #[test]
