@@ -1,5 +1,5 @@
-use async_std::sync::Sender;
 use serde_derive::{Deserialize, Serialize};
+use tokio::sync::mpsc::Sender;
 
 // TODO: confirm the name works for each
 // Matches `pyrinas_cloud_telemetry_type_t` in `pyrinas_cloud.h`

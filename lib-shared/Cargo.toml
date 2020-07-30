@@ -9,3 +9,4 @@ version = "0.1.0"
 [dependencies]
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
 serde_derive = "^1.0" # Serializing/deserializing
+tokio = "0.2.22"

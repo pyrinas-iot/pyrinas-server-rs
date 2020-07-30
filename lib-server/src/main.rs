@@ -1,22 +1,20 @@
-use async_std::os::unix::net::UnixListener;
-use async_std::sync::{channel, Receiver, Sender};
-use async_std::{prelude::*, task};
 use dotenv;
 use log::{debug, error, info};
-use paho_mqtt;
 use pyrinas_shared::Event;
+use rumqttc::{self, EventLoop, MqttOptions};
+use std::fs::File;
 use std::{
     collections::hash_map::{Entry, HashMap},
-    env, process, str,
-    sync::RwLock,
-    thread,
-    time::Duration,
+    env,
+    io::Read,
+    process,
 };
+use tokio::net::UnixListener;
+use tokio::stream::StreamExt;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::task;
 
-const TOPICS: &[&str] = &["+/+/pub"];
-const QOS: &[i32] = &[1];
-
-async fn sled_run(broker_sender: Sender<Event>) {
+async fn sled_run(mut broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
     let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -24,9 +22,10 @@ async fn sled_run(broker_sender: Sender<Event>) {
     broker_sender
         .send(Event::NewRunner {
             name: "sled".to_string(),
-            sender,
+            sender: sender.clone(),
         })
-        .await;
+        .await
+        .unwrap();
 
     let sled_db = dotenv::var("PYRINAS_SLED_DB").unwrap_or_else(|_| {
         error!("PYRINAS_SLED_DB must be set in environment!");
@@ -37,7 +36,7 @@ async fn sled_run(broker_sender: Sender<Event>) {
     let tree = sled::open(sled_db).expect("Error opening sled db.");
 
     // TODO: wait for event on reciever
-    while let Some(event) = reciever.next().await {
+    while let Some(event) = reciever.recv().await {
         // Only process NewOtaPackage events
         match event {
             Event::NewOtaPackage { uid, package } => {
@@ -69,38 +68,14 @@ async fn sled_run(broker_sender: Sender<Event>) {
     }
 }
 
-type UserTopics = RwLock<Vec<String>>;
-
-// fn on_connect_success(cli: &paho_mqtt::AsyncClient, _msgid: u16) {
-//     println!("Connection succeeded");
-//     let data = cli.user_data().unwrap();
-
-//     if let Some(lock) = data.downcast_ref::<UserTopics>() {
-//         let topics = lock.read().unwrap();
-//         println!("Subscribing to topics: {:?}", topics);
-
-//         // Create a QoS vector, same len as # topics
-//         let qos = vec![QOS; topics.len()];
-//         // Subscribe to the desired topic(s).
-//         cli.subscribe_many(&topics, &qos);
-//         // TODO: This doesn't yet handle a failed subscription.
-//     }
-// }
-
-// fn on_connect_failure(cli: &paho_mqtt::AsyncClient, _msgid: u16, rc: i32) {
-//     println!("Connection attempt failed with error code {}.\n", rc);
-//     thread::sleep(Duration::from_millis(2500));
-//     cli.reconnect_with_callbacks(on_connect_success, on_connect_failure);
-// }
-
-async fn mqtt_run(broker_sender: Sender<Event>) {
-    let trust_store_env = dotenv::var("PYRINAS_TRUST_STORE").unwrap_or_else(|_| {
-        error!("PYRINAS_TRUST_STORE must be set in environment!");
+async fn mqtt_run(mut broker_sender: Sender<Event>) {
+    let ca_cert_env = dotenv::var("PYRINAS_CA_CERT").unwrap_or_else(|_| {
+        error!("PYRINAS_CA_CERT must be set in environment!");
         process::exit(1);
     });
 
-    let key_store_env = dotenv::var("PYRINAS_KEY_STORE").unwrap_or_else(|_| {
-        error!("PYRINAS_KEY_STORE must be set in environment!");
+    let server_cert_env = dotenv::var("PYRINAS_SERVER_CERT").unwrap_or_else(|_| {
+        error!("PYRINAS_SERVER_CERT must be set in environment!");
         process::exit(1);
     });
 
@@ -115,6 +90,12 @@ async fn mqtt_run(broker_sender: Sender<Event>) {
         process::exit(1);
     });
 
+    // Port
+    let port = dotenv::var("PYRINAS_HOST_PORT").unwrap_or_else(|_| {
+        error!("PYRINAS_HOST_PORT must be set in environment!");
+        process::exit(1);
+    });
+
     // Get the sender/reciever associated with this particular task
     let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -122,27 +103,28 @@ async fn mqtt_run(broker_sender: Sender<Event>) {
     broker_sender
         .send(Event::NewRunner {
             name: "mqtt".to_string(),
-            sender,
+            sender: sender.clone(),
         })
-        .await;
+        .await
+        .unwrap();
 
     // We assume that we are in a valid directory.
-    let mut trust_store = env::current_dir().unwrap();
-    trust_store.push(trust_store_env);
+    let mut ca_cert = env::current_dir().unwrap();
+    ca_cert.push(ca_cert_env);
 
-    let mut key_store = env::current_dir().unwrap();
-    key_store.push(key_store_env);
+    let mut server_cert = env::current_dir().unwrap();
+    server_cert.push(server_cert_env);
 
     let mut private_key = env::current_dir().unwrap();
     private_key.push(private_key_env);
 
-    if !trust_store.exists() {
-        error!("The trust store file does not exist: {:?}", trust_store);
+    if !ca_cert.exists() {
+        error!("The trust store file does not exist: {:?}", ca_cert);
         process::exit(1);
     }
 
-    if !key_store.exists() {
-        error!("The key store file does not exist: {:?}", key_store);
+    if !server_cert.exists() {
+        error!("The key store file does not exist: {:?}", server_cert);
         process::exit(1);
     }
 
@@ -151,108 +133,71 @@ async fn mqtt_run(broker_sender: Sender<Event>) {
         process::exit(1);
     }
 
-    // let topics: Vec<String> = TOPICS.iter().map(|s| s.to_string()).collect();
+    // Read the ca_cert
+    let mut file = File::open(ca_cert).expect("Unable to open file!");
+    let mut ca_cert_buf = Vec::new();
+    file.read_to_end(&mut ca_cert_buf)
+        .expect("Unable to read to end");
 
-    // Create a client options
-    let create_opts = paho_mqtt::CreateOptionsBuilder::new()
-        .server_uri(host)
-        .client_id("ssl_publish_rs")
-        .max_buffered_messages(100)
-        .finalize();
+    // Read the server_cert
+    let mut file = File::open(server_cert).expect("Unable to open file!");
+    let mut server_cert_buf = Vec::new();
+    file.read_to_end(&mut server_cert_buf)
+        .expect("Unable to read to end");
 
-    let mut client = paho_mqtt::AsyncClient::new(create_opts).unwrap_or_else(|e| {
-        println!("Error creating the client: {:?}", e);
-        process::exit(1);
-    });
+    // Read the private_key
+    let mut file = File::open(private_key).expect("Unable to open file!");
+    let mut private_key_buf = Vec::new();
+    file.read_to_end(&mut private_key_buf)
+        .expect("Unable to read to end");
 
-    let ssl_opts = paho_mqtt::SslOptionsBuilder::new()
-        .trust_store(trust_store)
-        .unwrap()
-        .key_store(key_store)
-        .unwrap()
-        .private_key(private_key)
-        .unwrap()
-        .finalize();
+    // Create the options for the Mqtt client
+    let mut opt = MqttOptions::new("server", host, port.parse::<u16>().unwrap());
+    opt.set_keep_alive(5);
+    opt.set_ca(ca_cert_buf);
+    opt.set_client_auth(server_cert_buf, private_key_buf);
 
-    // client.set_message_callback(|_client, msg| {
-    //     if let Some(msg) = msg {
-    //         let topic = msg.topic();
-    //         let _payload_str = msg.payload_str();
+    let mut eventloop = EventLoop::new(opt, 10).await;
 
-    //         info!("Recieved! {}", topic);
-    //     }
-    // });
-
-    // info!("Connecting to MQTT broker.");
-    // client.connect_with_callbacks(conn_opts, on_connect_success, on_connect_failure);
-
-    // let mqtt_recieve_task = task::spawn(async move {
-    //     let conn_opts = paho_mqtt::ConnectOptionsBuilder::new()
-    //         .ssl_options(ssl_opts)
-    //         .keep_alive_interval(Duration::from_secs(20))
-    //         .automatic_reconnect(Duration::from_secs(20), Duration::from_secs(60))
-    //         .user_name("test")
-    //         .finalize();
-
-    //     // Get message stream before connecting.
-    //     let strm = client.get_stream(25);
-
-    //     // Connect and wait for it to complete or fail
-    //     println!("Connecting to MQTT broker.");
-    //     client.connect(conn_opts).await;
-
-    //     println!("Subscribing to topics: {:?}", TOPICS);
-    //     client.subscribe_many(TOPICS, QOS).await;
-
-    //     while let Some(msg_opt) = strm.next().await {
-    //         if let Some(msg) = msg_opt {
-    //             info!("Got mqtt message. {}", msg);
-    //         }
-    //     }
-    // });
-
-    // Make clone
-    while let Some(event) = reciever.next().await {
-        if client.is_connected() {
-            info!("connected to client..");
-        } else {
-            error!("client not connected..");
-            continue;
-        }
-
-        // Only process NewOtaPackage eventss
-        match event {
-            Event::NewOtaPackage { uid, package } => {
-                info!("mqtt_run: Event::NewOtaPackage");
-
-                // Serialize this buddy
-                let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
-
-                // Generate topic
-                let sub_topic = format!("{}/ota/sub", uid);
-
-                // Create a new message
-                let msg = paho_mqtt::Message::new(&sub_topic, res, paho_mqtt::QOS_1);
-
-                info!("Publishing message to {}", &sub_topic);
-
-                // Publish to the UID in question
-                // if let Err(e) = client.publish(msg).await {
-                //     error!("Unable to publish to {}. Error: {}", sub_topic, e);
-                // } else {
-                //     info!("Published..");
-                // }
-            }
-            _ => (),
-        };
+    loop {
+        let (incoming, outgoing) = eventloop.poll().await.unwrap();
+        println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
     }
+
+    // while let Some(event) = reciever.recv().await {
+    //     // Only process NewOtaPackage eventss
+    //     match event {
+    //         Event::NewOtaPackage { uid, package } => {
+    //             info!("mqtt_run: Event::NewOtaPackage");
+
+    //             // Serialize this buddy
+    //             let _res = serde_cbor::ser::to_vec_packed(&package).unwrap();
+
+    //             // Generate topic
+    //             let sub_topic = format!("{}/ota/sub", uid);
+
+    //             // Create a new message
+    //             // let msg = paho_mqtt::Message::new(&sub_topic, res, paho_mqtt::QOS_1);
+
+    //             info!("Publishing message to {}", &sub_topic);
+
+    //             // Publish to the UID in question
+    //             // if let Err(e) = client.publish(msg).await {
+    //             //     error!("Unable to publish to {}. Error: {}", sub_topic, e);
+    //             // } else {
+    //             //     info!("Published..");
+    //             // }
+    //         }
+    //         _ => (),
+    //     };
+    // }
 
     // TODO: join the above tasks
     // mqtt_recieve_task.join(mqtt_send_task);
 }
 
 // Only requires a sender. No response necessary here... yet.
-async fn sock_run(broker_sender: Sender<Event>) {
+async fn sock_run(mut broker_sender: Sender<Event>) {
     let socket_path = dotenv::var("PYRINAS_SOCKET_PATH").unwrap_or_else(|_| {
         error!("PYRINAS_SOCKET_PATH must be set in environment!");
         process::exit(1);
@@ -265,9 +210,10 @@ async fn sock_run(broker_sender: Sender<Event>) {
     broker_sender
         .send(Event::NewRunner {
             name: "sock".to_string(),
-            sender,
+            sender: sender.clone(),
         })
-        .await;
+        .await
+        .unwrap();
 
     debug!("Removing previous sock!");
 
@@ -275,40 +221,38 @@ async fn sock_run(broker_sender: Sender<Event>) {
     let _ = std::fs::remove_file(&socket_path);
 
     // Make connection
-    let listener = UnixListener::bind(&socket_path)
-        .await
-        .expect("Unable to bind!");
+    let mut listener = UnixListener::bind(&socket_path).expect("Unable to bind!");
     let mut incoming = listener.incoming();
 
     debug!("Created socket listener!");
 
-    while let Some(stream) = incoming.next().await {
+    while let Some(_stream) = incoming.next().await {
         debug!("Got stream!");
 
         // Setup work to make this happen
-        let mut stream = stream.unwrap();
-        let mut buffer = Vec::new();
+        // let mut stream = stream.unwrap(); //Box::<UnixStream>::new(stream.unwrap());
+        // let mut buffer = Vec::new();
 
         // Read until the stream closes
-        stream
-            .read_to_end(&mut buffer)
-            .await
-            .expect("Unable to write to socket.");
+        // stream
+        //     .read_to_end(&mut buffer)
+        //     .await
+        //     .expect("Unable to write to socket.");
 
-        // Get string from the buffer
-        let s = str::from_utf8(&buffer).unwrap();
-        info!("{}", s);
+        // // Get string from the buffer
+        // let s = str::from_utf8(&buffer).unwrap();
+        // info!("{}", s);
 
-        // Decode into struct
-        let res: pyrinas_shared::NewOta = serde_json::from_str(&s).unwrap();
+        // // Decode into struct
+        // let res: pyrinas_shared::NewOta = serde_json::from_str(&s).unwrap();
 
-        // Send result back to broker
-        broker_sender
-            .send(Event::NewOtaPackage {
-                uid: res.uid,
-                package: res.package,
-            })
-            .await;
+        // // Send result back to broker
+        // broker_sender
+        //     .send(Event::NewOtaPackage {
+        //         uid: res.uid,
+        //         package: res.package,
+        //     })
+        //     .await;
     }
 }
 
@@ -316,7 +260,7 @@ async fn broker_run(mut broker_reciever: Receiver<Event>) {
     let mut runners: HashMap<String, Sender<Event>> = HashMap::new();
 
     // Handle broker events
-    while let Some(event) = broker_reciever.next().await {
+    while let Some(event) = broker_reciever.recv().await {
         match event {
             // Upon creating a new server thread, the thread has to register with the broker.
             Event::NewRunner { name, sender } => {
@@ -336,30 +280,33 @@ async fn broker_run(mut broker_reciever: Receiver<Event>) {
 
                 // Send to sled
                 runners
-                    .get("sled")
+                    .get_mut("sled")
                     .unwrap()
                     .send(Event::NewOtaPackage {
                         uid: uid.clone(),
                         package: package.clone(),
                     })
-                    .await;
+                    .await
+                    .unwrap();
 
                 // Send to mqtt
                 runners
-                    .get("mqtt")
+                    .get_mut("mqtt")
                     .unwrap()
                     .send(Event::NewOtaPackage {
                         uid: uid.clone(),
                         package: package.clone(),
                     })
-                    .await;
+                    .await
+                    .unwrap();
             }
             _ => (),
         }
     }
 }
 
-fn main() {
+#[tokio::main()]
+async fn main() {
     // Initialize the logger from the environment
     env_logger::init();
 
@@ -374,16 +321,19 @@ fn main() {
     // TODO: init http service
 
     // Start sled task
-    let _sled_task = task::spawn(sled_run(broker_sender.clone()));
+    let sled_task = task::spawn(sled_run(broker_sender.clone()));
 
     // Start unix socket task
-    let _unix_sock_task = task::spawn(sock_run(broker_sender.clone()));
+    let unix_sock_task = task::spawn(sock_run(broker_sender.clone()));
 
     // Spawn a new task for the MQTT stuff
-    let _mqtt_task = task::spawn(mqtt_run(broker_sender.clone()));
+    let mqtt_task = task::spawn(mqtt_run(broker_sender.clone()));
 
     // Spawn the broker task that handles it all!
-    let _broker_task = task::block_on(broker_run(broker_reciever));
+    let broker_task = task::spawn(broker_run(broker_reciever));
+
+    // Join hands kids
+    let _join = tokio::join!(sled_task, unix_sock_task, mqtt_task, broker_task);
 
     info!("Done!");
 }
