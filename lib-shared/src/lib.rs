@@ -1,3 +1,4 @@
+use async_std::sync::Sender;
 use serde_derive::{Deserialize, Serialize};
 
 // TODO: confirm the name works for each
@@ -12,7 +13,7 @@ pub struct Telemetry {
 }
 
 // Struct that gets serialized for OTA support
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OTAPackage {
     pub version: String,
     pub host: String,
@@ -20,10 +21,27 @@ pub struct OTAPackage {
     pub force: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NewOta {
     pub uid: String,
     pub package: OTAPackage,
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    NewRunner {
+        name: String,
+        sender: Sender<Event>,
+    },
+    NewOtaPackage {
+        uid: String,
+        package: OTAPackage,
+    },
+    Message {
+        from: String,
+        to: Vec<String>,
+        msg: String,
+    },
 }
 
 #[cfg(test)]
