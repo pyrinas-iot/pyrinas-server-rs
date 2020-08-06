@@ -1,14 +1,15 @@
 use dotenv;
 use log::{debug, error, info};
 use pyrinas_shared::Event;
-use rumqttc::{self, EventLoop, MqttOptions};
+use rumqttc::{self, EventLoop, MqttOptions, Packet, Publish, QoS, Request, Subscribe};
 use std::fs::File;
 use std::{
     collections::hash_map::{Entry, HashMap},
     env,
     io::Read,
-    process,
+    process, str,
 };
+use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -153,47 +154,75 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
 
     // Create the options for the Mqtt client
     let mut opt = MqttOptions::new("server", host, port.parse::<u16>().unwrap());
-    opt.set_keep_alive(5);
-    opt.set_ca(ca_cert_buf);
-    opt.set_client_auth(server_cert_buf, private_key_buf);
+    opt.set_keep_alive(120);
+    // TODO: add these back when things are working again...
+    // opt.set_ca(ca_cert_buf);
+    // opt.set_client_auth(server_cert_buf, private_key_buf);
 
     let mut eventloop = EventLoop::new(opt, 10).await;
+    let tx = eventloop.handle();
+
+    let _ = task::spawn(async move {
+
+        // Master subscription list
+        let subscribe: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
+
+        // Iterate though all potential subscriptions
+        for item in subscribe.iter() {
+            // Set up subscription
+            let subscription = Subscribe::new(*item, QoS::AtMostOnce);
+            tx.send(Request::Subscribe(subscription))
+                .await
+                .unwrap_or_else(|e| {
+                    println!("Unable to subscribe! Error: {}", e);
+                    process::exit(1);
+                });
+        }
+
+        while let Some(event) = reciever.recv().await {
+            // Only process NewOtaPackage eventss
+            match event {
+                Event::NewOtaPackage { uid, package } => {
+                    info!("mqtt_run: Event::NewOtaPackage");
+
+                    // Serialize this buddy
+                    let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
+
+                    // Generate topic
+                    let sub_topic = format!("{}/ota/sub", uid);
+
+                    // Create a new message
+                    let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
+
+                    info!("Publishing message to {}", &sub_topic);
+
+                    // Publish to the UID in question
+                    if let Err(e) = tx.send(Request::Publish(msg)).await {
+                        error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                    } else {
+                        info!("Published..");
+                    }
+                }
+                _ => (),
+            };
+        }
+    });
 
     loop {
-        let (incoming, outgoing) = eventloop.poll().await.unwrap();
-        println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+        if let Ok((incoming, _)) = eventloop.poll().await {
+            match incoming {
+                None => {}
+                Some(msg) => {
+                    match msg {
+                        Packet::Publish(msg) => {
+                            println!("Publish = {:?}", msg);
+                        }
+                        _ => {}
+                    };
+                }
+            }
+        };
     }
-
-    // while let Some(event) = reciever.recv().await {
-    //     // Only process NewOtaPackage eventss
-    //     match event {
-    //         Event::NewOtaPackage { uid, package } => {
-    //             info!("mqtt_run: Event::NewOtaPackage");
-
-    //             // Serialize this buddy
-    //             let _res = serde_cbor::ser::to_vec_packed(&package).unwrap();
-
-    //             // Generate topic
-    //             let sub_topic = format!("{}/ota/sub", uid);
-
-    //             // Create a new message
-    //             // let msg = paho_mqtt::Message::new(&sub_topic, res, paho_mqtt::QOS_1);
-
-    //             info!("Publishing message to {}", &sub_topic);
-
-    //             // Publish to the UID in question
-    //             // if let Err(e) = client.publish(msg).await {
-    //             //     error!("Unable to publish to {}. Error: {}", sub_topic, e);
-    //             // } else {
-    //             //     info!("Published..");
-    //             // }
-    //         }
-    //         _ => (),
-    //     };
-    // }
-
-    // TODO: join the above tasks
-    // mqtt_recieve_task.join(mqtt_send_task);
 }
 
 // Only requires a sender. No response necessary here... yet.
@@ -226,33 +255,33 @@ async fn sock_run(mut broker_sender: Sender<Event>) {
 
     debug!("Created socket listener!");
 
-    while let Some(_stream) = incoming.next().await {
+    while let Some(stream) = incoming.next().await {
         debug!("Got stream!");
 
         // Setup work to make this happen
-        // let mut stream = stream.unwrap(); //Box::<UnixStream>::new(stream.unwrap());
-        // let mut buffer = Vec::new();
+        let mut stream = stream.unwrap(); //Box::<UnixStream>::new(stream.unwrap());
+        let mut buffer = Vec::new();
 
         // Read until the stream closes
-        // stream
-        //     .read_to_end(&mut buffer)
-        //     .await
-        //     .expect("Unable to write to socket.");
+        stream
+            .read_to_end(&mut buffer)
+            .await
+            .expect("Unable to write to socket.");
 
-        // // Get string from the buffer
-        // let s = str::from_utf8(&buffer).unwrap();
-        // info!("{}", s);
+        // Get string from the buffer
+        let s = str::from_utf8(&buffer).unwrap();
+        info!("{}", s);
 
-        // // Decode into struct
-        // let res: pyrinas_shared::NewOta = serde_json::from_str(&s).unwrap();
+        // Decode into struct
+        let res: pyrinas_shared::NewOta = serde_json::from_str(&s).unwrap();
 
-        // // Send result back to broker
-        // broker_sender
-        //     .send(Event::NewOtaPackage {
-        //         uid: res.uid,
-        //         package: res.package,
-        //     })
-        //     .await;
+        // Send result back to broker
+        let _ = broker_sender
+            .send(Event::NewOtaPackage {
+                uid: res.uid,
+                package: res.package,
+            })
+            .await;
     }
 }
 
