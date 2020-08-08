@@ -1,17 +1,12 @@
-use dotenv;
-use log::{debug, error, info, warn};
-use std::fs::File;
-use std::{
-  collections::hash_map::{Entry, HashMap},
-  env,
-  io::Read,
-  process, str,
-};
+// System related
+use log::info;
+use std::collections::hash_map::{Entry, HashMap};
 
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+// Tokio related
+use tokio::sync::mpsc::{Receiver, Sender};
 
 // Local lib related
-use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd};
+use pyrinas_shared::Event;
 
 pub async fn run(mut broker_reciever: Receiver<Event>) {
   let mut runners: HashMap<String, Sender<Event>> = HashMap::new();

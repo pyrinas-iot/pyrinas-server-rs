@@ -1,213 +1,257 @@
-use async_std::{prelude::*, task};
-use paho_mqtt as mqtt;
-use std::{process, time::Duration};
+// Sytem related
+use dotenv;
+use log::{error, info, warn};
+use std::fs::File;
+use std::io::Read;
+use std::{env, process};
 
-const TOPICS: &[&str] = &["+/+/pub"];
-const QOS: &[i32] = &[1];
+// Tokio async related
+use tokio::sync::mpsc::{channel, Sender};
+use tokio::task;
 
-/////////////////////////////////////////////////////////////////////////////
+// MQTT related
+use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
 
-// Struct that can be used elsewhere
-pub struct MQTTCloud {
-  client: mqtt::AsyncClient,
-  trust_store: String,
-  key_store: String,
-  private_key: String,
-}
+// Local lib related
+use pyrinas_shared::Event;
 
-// Implement the functions related to the cloud
-impl MQTTCloud {
-  pub fn new(host: &str) -> Self {
-    println!("Connecting to host: '{}'", host);
+// Master subscription list
+const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
 
-    // Create a client options
-    let create_opts = mqtt::CreateOptionsBuilder::new()
-      .server_uri(host)
-      .client_id("ssl_publish_rs")
-      .max_buffered_messages(100)
-      .finalize();
+pub async fn run(mut broker_sender: Sender<Event>) {
+  let ca_cert_env = dotenv::var("PYRINAS_CA_CERT").unwrap_or_else(|_| {
+    error!("PYRINAS_CA_CERT must be set in environment!");
+    process::exit(1);
+  });
 
-    let client = mqtt::AsyncClient::new(create_opts).unwrap_or_else(|e| {
-      println!("Error creating the client: {:?}", e);
-      process::exit(1);
-    });
+  let server_cert_env = dotenv::var("PYRINAS_SERVER_CERT").unwrap_or_else(|_| {
+    error!("PYRINAS_SERVER_CERT must be set in environment!");
+    process::exit(1);
+  });
 
-    Self {
-      client: client,
-      key_store: "".to_string(),
-      private_key: "".to_string(),
-      trust_store: "".to_string(),
+  let private_key_env = dotenv::var("PYRINAS_PRIVATE_KEY").unwrap_or_else(|_| {
+    error!("PYRINAS_PRIVATE_KEY must be set in environment!");
+    process::exit(1);
+  });
+
+  // Let the user override the host, but note the "ssl://" protocol.
+  let host = dotenv::var("PYRINAS_MQTT_HOST").unwrap_or_else(|_| {
+    error!("PYRINAS_MQTT_HOST must be set in environment!");
+    process::exit(1);
+  });
+
+  // Port
+  let port = dotenv::var("PYRINAS_MQTT_HOST_PORT").unwrap_or_else(|_| {
+    error!("PYRINAS_MQTT_HOST_PORT must be set in environment!");
+    process::exit(1);
+  });
+
+  // Get the sender/reciever associated with this particular task
+  let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+
+  // Register this task
+  broker_sender
+    .send(Event::NewRunner {
+      name: "mqtt".to_string(),
+      sender: sender.clone(),
+    })
+    .await
+    .unwrap();
+
+  // We assume that we are in a valid directory.
+  let mut ca_cert = env::current_dir().unwrap();
+  ca_cert.push(ca_cert_env);
+
+  let mut server_cert = env::current_dir().unwrap();
+  server_cert.push(server_cert_env);
+
+  let mut private_key = env::current_dir().unwrap();
+  private_key.push(private_key_env);
+
+  if !ca_cert.exists() {
+    error!("The trust store file does not exist: {:?}", ca_cert);
+    process::exit(1);
+  }
+
+  if !server_cert.exists() {
+    error!("The key store file does not exist: {:?}", server_cert);
+    process::exit(1);
+  }
+
+  if !private_key.exists() {
+    error!("The key store file does not exist: {:?}", private_key);
+    process::exit(1);
+  }
+
+  // Read the ca_cert
+  let mut file = File::open(ca_cert).expect("Unable to open file!");
+  let mut ca_cert_buf = Vec::new();
+  file
+    .read_to_end(&mut ca_cert_buf)
+    .expect("Unable to read to end");
+
+  // Read the server_cert
+  let mut file = File::open(server_cert).expect("Unable to open file!");
+  let mut server_cert_buf = Vec::new();
+  file
+    .read_to_end(&mut server_cert_buf)
+    .expect("Unable to read to end");
+
+  // Read the private_key
+  let mut file = File::open(private_key).expect("Unable to open file!");
+  let mut private_key_buf = Vec::new();
+  file
+    .read_to_end(&mut private_key_buf)
+    .expect("Unable to read to end");
+
+  // Create the options for the Mqtt client
+  let mut opt = MqttOptions::new("server", host, port.parse::<u16>().unwrap());
+  opt.set_keep_alive(120);
+  // TODO: add these back when things are working again...
+  // opt.set_ca(ca_cert_buf);
+  // opt.set_client_auth(server_cert_buf, private_key_buf);
+
+  let mut eventloop = EventLoop::new(opt, 10).await;
+  let tx = eventloop.handle();
+
+  // Loop for sending messages from main broker
+  let _ = task::spawn(async move {
+    // TODO: handle cases were the sesion is not maintained..
+
+    // Iterate though all potential subscriptions
+    for item in SUBSCRIBE.iter() {
+      // Set up subscription
+      let subscription = Subscribe::new(*item, QoS::AtMostOnce);
+      tx.send(Request::Subscribe(subscription))
+        .await
+        .unwrap_or_else(|e| {
+          println!("Unable to subscribe! Error: {}", e);
+          process::exit(1);
+        });
     }
-  }
 
-  pub fn set_certs(&mut self, trust_store: &str, private_key: &str, key_store: &str) {
-    self.key_store = key_store.to_string();
-    self.private_key = private_key.to_string();
-    self.trust_store = trust_store.to_string();
-  }
+    while let Some(event) = reciever.recv().await {
+      // Only process OtaNewPackage eventss
+      match event {
+        Event::OtaResponse { uid, package } => {
+          info!("mqtt_run: Event::OtaResponse");
 
-  fn assemble_ota_pkg_response(&self, uid: &str) -> Option<mqtt::Message> {
-    // TODO: send serialized CBOR back
-    let package = pyrinas_shared::OTAPackage {
-      version: "0.1.0".to_string(),
-      host: "dreamstars.s3.amazonaws.com".to_string(),
-      file: "app_update.bin".to_string(),
-      force: true,
+          // Serialize this buddy
+          let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
+
+          // Generate topic
+          let sub_topic = format!("{}/ota/sub", uid);
+
+          // Create a new message
+          let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
+
+          info!("Publishing message to {}", &sub_topic);
+
+          // Publish to the UID in question
+          // TODO: wrap this guy up in a separate spawn so it can get back to work.
+          if let Err(e) = tx.send(Request::Publish(msg)).await {
+            error!("Unable to publish to {}. Error: {}", sub_topic, e);
+          } else {
+            info!("Published..");
+          }
+        }
+        _ => (),
+      };
+    }
+  });
+
+  // Loop for recieving messages
+  loop {
+    if let Ok((incoming, _)) = eventloop.poll().await {
+      // If we have an actual message
+      if incoming.is_some() {
+        // Get the message
+        let msg = incoming.unwrap();
+
+        // Sort it
+        match msg {
+          // Incoming::Publish is the main thing we're concerned with here..
+          Incoming::Publish(msg) => {
+            println!("Publish = {:?}", msg);
+
+            // Get the uid and topic
+            let mut topic = msg.topic.split('/');
+            let uid = topic.next().unwrap_or_default();
+            let event_type = topic.next().unwrap_or_default();
+            let pub_sub = topic.next().unwrap_or_default();
+
+            // Continue if not euql to pub
+            if pub_sub != "pub" {
+              warn!("Pubsub not 'pub'. Value: {}", pub_sub);
+              continue;
+            }
+
+            match event_type {
+              "ota" => {
+                // Get the telemetry data
+                let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error>;
+
+                // Get the result
+                res = serde_cbor::from_slice(msg.payload.as_ref());
+
+                // Match function to handle error
+                match res {
+                  Ok(n) => {
+                    println!("{:?}", n);
+
+                    // Send message to broker
+                    broker_sender
+                      .send(Event::OtaRequest {
+                        uid: uid.to_string(),
+                        msg: n,
+                      })
+                      .await
+                      .unwrap();
+                  }
+                  Err(e) => println!("Decode error: {}", e),
+                }
+              }
+              "tel" => {
+                // Get the telemetry data
+                let res: Result<pyrinas_shared::TelemetryData, serde_cbor::error::Error>;
+
+                // Get the result
+                res = serde_cbor::from_slice(msg.payload.as_ref());
+
+                // Match function to handle error
+                match res {
+                  Ok(n) => {
+                    println!("{:?}", n);
+                    // Send data to broker
+                    broker_sender
+                      .send(Event::TelemetryData {
+                        uid: uid.to_string(),
+                        msg: n,
+                      })
+                      .await
+                      .unwrap();
+                  }
+                  Err(e) => println!("Decode error: {}", e),
+                }
+              }
+              "app" => {
+                // TODO: Deserialize data?
+
+                // Send data to broker
+                broker_sender
+                  .send(Event::ApplicationData {
+                    uid: uid.to_string(),
+                    msg: msg.payload,
+                  })
+                  .await
+                  .unwrap();
+              }
+              _ => {}
+            }
+          }
+          _ => {}
+        };
+      }
     };
-
-    // Serialize this buddy
-    let res = serde_cbor::ser::to_vec_packed(&package);
-
-    if res.is_ok() {
-      let res = res.unwrap();
-
-      println!("ota response serialized! size: {}", res.len());
-      //TODO: Send back to the UUID in question using <UID>/ota/sub/
-      let sub_topic = format!("{}/ota/sub", uid);
-
-      // Send payload
-      return Some(mqtt::Message::new(sub_topic, res, mqtt::QOS_1));
-    }
-    None
-  }
-
-  // Filters events and processes accordingly
-  fn handle_events(&self, msg: &mqtt::message::Message) -> Option<mqtt::Message> {
-    println!("{}", msg);
-
-    // TODO: handle telemetry events
-    if msg.topic().contains("/tel/pub") {
-      // TODO: CBOR deserialize
-
-      // Get the telemetry data
-      let res: Result<pyrinas_shared::Telemetry, serde_cbor::error::Error> =
-        serde_cbor::from_slice(msg.payload());
-
-      match res {
-        Ok(n) => println!("{:?}", n),
-        Err(e) => println!("error: {}", e),
-      }
-
-    // TODO: serialize into InfluxDB string
-    } else if msg.topic().contains("/app/pub") {
-      // TODO: handle app events
-      // TODO: CBOR deserialize
-      // TODO: serialize into InfluxDB string
-
-      println!("application");
-    } else if msg.topic().contains("/ota/pub") {
-      // TODO: handle OTA events
-
-      // Get the payload
-      let payload = msg.payload();
-
-      // Make sure we've gotten only 1 byte
-      if payload.len() == 1 {
-        // Get the UID from the topic
-        let uid = msg.topic().strip_suffix("/ota/pub").unwrap();
-        println!("ota uid: {}", uid);
-
-        // Get the command
-        let ota_cmd = payload[0];
-
-        // Match the output of the OTA cmd
-        match ota_cmd {
-          // Status check
-          0 => {
-            println!("Checking for OTA");
-            // TODO: check if OTA is applicable for UID
-
-            // TODO: if so create http endpoint (or do nothing if it already exists)
-
-            // TODO: creat sled entry with UID for file download and UID of device
-
-            // If we have an update, assbmle the package
-            // return self.assemble_ota_pkg_response(&uid);
-          }
-          // Indicate done
-          1 => {
-            println!("Done with OTA");
-            // TODO: mark complete in sled against UID
-
-            // TODO: remove HTTP endpoint
-          }
-          // All remaining, do nothing
-          _ => (),
-        }
-      }
-    }
-    None
-  }
-
-  // TODO: remove this
-  #[allow(dead_code)]
-  pub fn publish() {}
-
-  #[allow(dead_code)]
-  pub fn disconnect() {}
-
-  pub fn start(&mut self) {
-    let ssl_opts = mqtt::SslOptionsBuilder::new()
-      .trust_store(self.trust_store.clone())
-      .unwrap()
-      .key_store(self.key_store.clone())
-      .unwrap()
-      .private_key(self.private_key.clone())
-      .unwrap()
-      .finalize();
-
-    let conn_opts = mqtt::ConnectOptionsBuilder::new()
-      .ssl_options(ssl_opts)
-      .keep_alive_interval(Duration::from_secs(20))
-      .automatic_reconnect(Duration::from_secs(20), Duration::from_secs(60))
-      .user_name("test")
-      .finalize();
-
-    if let Err(err) = task::block_on(async {
-      // Get message stream before connecting.
-      let mut strm = self.client.get_stream(25);
-
-      // Connect and wait for it to complete or fail
-      println!("Connecting to MQTT broker.");
-      self.client.connect(conn_opts).await?;
-
-      println!("Subscribing to topics: {:?}", TOPICS);
-      self.client.subscribe_many(TOPICS, QOS).await?;
-
-      // let uid = "352656102545228";
-      // if let Some(msg) = self.assemble_ota_pkg_response(&uid) {
-      //   println!("publishing ota msg {}", msg);
-      //   self.client.publish(msg).await?;
-      // }
-
-      while let Some(msg_opt) = strm.next().await {
-        if let Some(msg) = msg_opt {
-          // If it returns a message, publish it
-          if let Some(resp) = self.handle_events(&msg) {
-            println!("Sending message");
-            self.client.publish(resp).await?;
-          }
-        }
-      }
-
-      // Explicit return type for the async block
-      Ok::<(), mqtt::Error>(())
-    }) {
-      eprintln!("{}", err);
-    }
-
-    // let msg = mqtt::MessageBuilder::new()
-    //     .topic("352656102545228/ota/sub")
-    //     .payload("\0")
-    //     .qos(1)
-    //     .finalize();
-
-    // let tok = cli.publish(msg);
-    // if let Err(e) = tok.wait() {
-    //     println!("Error sending message: {:?}", e);
-    // }
-
-    // let tok = cli.disconnect(None);
-    // let _ = tok.wait();
   }
 }
