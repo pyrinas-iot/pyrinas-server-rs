@@ -7,12 +7,8 @@ use tokio::sync::mpsc::channel;
 use tokio::task;
 
 // Local lib related
-mod broker;
-mod bucket;
-mod influx;
-mod mqtt;
-mod sled;
-mod sock;
+extern crate pyrinas_server;
+use pyrinas_server::{broker, bucket, influx, mqtt, sled, sock};
 
 #[tokio::main()]
 async fn main() {
