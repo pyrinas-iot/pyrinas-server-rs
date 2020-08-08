@@ -7,6 +7,8 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aws-creds = "^0.22.2" 
+aws-region = "^0.21.0" 
 diesel = {version = "^1.4.4", features = ["sqlite", "chrono"]}# ORM for database work 
 diesel_migrations = "^1.4.0" # Automatic diesel migrations when starting the app
 dotenv = "^0.9.0" # .env file parsing
@@ -14,6 +16,7 @@ env_logger = "^0.7" # logging message control using env variable
 influxdb = {version = "^0.1.0", features = ["derive"]}# InfluxDB access 
 log = "^0.4.11" # logging messages
 rumqttc = {git = "https://github.com/bytebeamio/rumqtt"}# Mqtt core bits 
+rust-s3 = "^0.22.12" # Handling upload of files
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
 serde_derive = "^1.0" # Serializing/deserializing structs

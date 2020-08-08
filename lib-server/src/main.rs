@@ -8,6 +8,7 @@ use tokio::task;
 
 // Local lib related
 mod broker;
+mod bucket;
 mod influx;
 mod mqtt;
 mod sled;
@@ -30,6 +31,9 @@ async fn main() {
     // TODO: init http service
 
     // Start sled task
+    let bucket_task = task::spawn(bucket::run(broker_sender.clone()));
+
+    // Start sled task
     let sled_task = task::spawn(sled::run(broker_sender.clone()));
 
     // Start unix socket task
@@ -47,7 +51,8 @@ async fn main() {
         influx_task,
         unix_sock_task,
         mqtt_task,
-        broker_task
+        broker_task,
+        bucket_task
     );
 
     info!("Done!");

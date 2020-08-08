@@ -1,5 +1,5 @@
 use dotenv;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::process;
 
 use tokio::sync::mpsc::{channel, Sender};
@@ -7,6 +7,32 @@ use tokio::time::{delay_for, Duration};
 
 // Local lib related
 use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd};
+
+// Todo better way of passing error..
+fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
+  // Check if there's a package available and ready
+  let entry = db.get(&uid);
+  if entry.is_err() {
+    return Err(format!("{}", entry.unwrap_err()));
+  }
+  let entry = entry.unwrap();
+
+  // Raw data
+  let data = entry.as_ref();
+  if data.is_none() {
+    return Err(format!("Unable to get u8 data."));
+  }
+
+  // Deserialize it
+  let package: Result<OTAPackage, serde_cbor::error::Error> =
+    serde_cbor::de::from_slice(&data.unwrap());
+
+  // Return the result
+  match package {
+    Err(e) => Err(format!("{}", e)),
+    Ok(p) => Ok(p),
+  }
+}
 
 pub async fn run(mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
@@ -60,38 +86,50 @@ pub async fn run(mut broker_sender: Sender<Event>) {
           OtaRequestCmd::Done => {
             info!("Done!");
 
+            // Send the DeletePackage command (for S3 Bucket)
+            let package = get_ota_package(&tree, &uid);
+            match package {
+              Ok(p) => {
+                info!("Package found!");
+                // Send it
+                broker_sender
+                  .send(Event::OtaDeletePackage {
+                    uid: uid.clone(),
+                    package: p,
+                  })
+                  .await
+                  .unwrap();
+              }
+              Err(e) => {
+                warn!("Unable to get package. Err: {}", e);
+              }
+            }
+
             // Delete entry from dB
             if let Err(e) = tree.remove(&uid) {
               error!("Unable to remove {} from OTA database. Error: {}", &uid, e);
             }
-
-            // TODO: send signal to delete it also from S3
           }
           OtaRequestCmd::Check => {
             info!("Check!");
 
             // Check if there's a package available and ready
-            if let Ok(entry) = tree.get(&uid) {
-              // Raw data
-              let data = entry.unwrap();
-              let data = data.as_ref();
-
-              // Deserialize it
-              let package: Result<OTAPackage, serde_cbor::error::Error> =
-                serde_cbor::de::from_slice(&data);
-              if package.is_err() {
-                error!("Unable to deserialize data!");
-                continue;
+            let package = get_ota_package(&tree, &uid);
+            match package {
+              Ok(p) => {
+                info!("Package found!");
+                // Send it
+                broker_sender
+                  .send(Event::OtaResponse {
+                    uid: uid.clone(),
+                    package: p,
+                  })
+                  .await
+                  .unwrap();
               }
-
-              // Send it
-              broker_sender
-                .send(Event::OtaResponse {
-                  uid: uid,
-                  package: package.unwrap(),
-                })
-                .await
-                .unwrap();
+              Err(e) => {
+                warn!("Unable to get package. Err: {}", e);
+              }
             }
           }
         }
@@ -100,11 +138,15 @@ pub async fn run(mut broker_sender: Sender<Event>) {
       Event::OtaNewPackage { uid, package } => {
         info!("sled_run: Event::OtaNewPackage");
 
-        if let Ok(_) = tree.get(&uid) {
-          error!("Update already exists for {}.", &uid);
+        if let Ok(entry) = tree.get(&uid) {
+          // Get the u8 data
+          let data = entry.as_ref();
+          if data.is_some() {
+            error!("Update already exists for {}.", &uid);
 
-          // TODO: return error somehow..
-          continue;
+            // If there's someting there, no chance to update yet..
+            continue;
+          }
         }
 
         // Turn entry.package into CBOR

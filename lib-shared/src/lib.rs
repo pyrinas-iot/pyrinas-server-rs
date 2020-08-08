@@ -77,6 +77,7 @@ pub enum Event {
     OtaResponse { uid: String, package: OTAPackage },
     TelemetryData { uid: String, msg: TelemetryData },
     ApplicationData { uid: String, msg: Bytes },
+    OtaDeletePackage { uid: String, package: OTAPackage },
     SledFlush,
 }
 

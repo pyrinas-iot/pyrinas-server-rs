@@ -69,7 +69,17 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
           .await
           .unwrap();
       }
+      Event::OtaDeletePackage { uid: _, package: _ } => {
+        info!("broker_run: OtaDeletePackage");
 
+        // Send to bucket handler
+        runners
+          .get_mut("bucket")
+          .unwrap()
+          .send(event.clone())
+          .await
+          .unwrap();
+      }
       _ => (),
     }
   }
