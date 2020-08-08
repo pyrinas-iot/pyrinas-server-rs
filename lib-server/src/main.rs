@@ -1,7 +1,5 @@
 use dotenv;
-use log::{debug, error, info};
-use pyrinas_shared::Event;
-use rumqttc::{self, EventLoop, MqttOptions, Packet, Publish, QoS, Request, Subscribe};
+use log::{debug, error, info, warn};
 use std::fs::File;
 use std::{
     collections::hash_map::{Entry, HashMap},
@@ -9,11 +7,25 @@ use std::{
     io::Read,
     process, str,
 };
+
+// Tokio Related
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::task;
+
+// Influx Related
+use influxdb::{Client, InfluxDbWriteable};
+
+// MQTT related
+use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
+
+// Local lib related
+use pyrinas_shared::{Event, OtaRequestCmd};
+
+// Master subscription list
+const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
 
 async fn sled_run(mut broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
@@ -38,10 +50,12 @@ async fn sled_run(mut broker_sender: Sender<Event>) {
 
     // TODO: wait for event on reciever
     while let Some(event) = reciever.recv().await {
-        // Only process NewOtaPackage events
+        // Only process OtaResponse events
         match event {
-            Event::NewOtaPackage { uid, package } => {
-                info!("sled_run: Event::NewOtaPackage");
+            Event::OtaResponse { uid, package } => {
+                info!("sled_run: Event::OtaResponse");
+
+                // TODO handle different commands (currently request and done). Below is the request command
 
                 // Turn entry.package into CBOR
                 let res = serde_cbor::ser::to_vec_packed(&package);
@@ -86,14 +100,14 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
     });
 
     // Let the user override the host, but note the "ssl://" protocol.
-    let host = dotenv::var("PYRINAS_HOST").unwrap_or_else(|_| {
-        error!("PYRINAS_HOST must be set in environment!");
+    let host = dotenv::var("PYRINAS_MQTT_HOST").unwrap_or_else(|_| {
+        error!("PYRINAS_MQTT_HOST must be set in environment!");
         process::exit(1);
     });
 
     // Port
-    let port = dotenv::var("PYRINAS_HOST_PORT").unwrap_or_else(|_| {
-        error!("PYRINAS_HOST_PORT must be set in environment!");
+    let port = dotenv::var("PYRINAS_MQTT_HOST_PORT").unwrap_or_else(|_| {
+        error!("PYRINAS_MQTT_HOST_PORT must be set in environment!");
         process::exit(1);
     });
 
@@ -162,13 +176,12 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
     let mut eventloop = EventLoop::new(opt, 10).await;
     let tx = eventloop.handle();
 
+    // Loop for sending messages from main broker
     let _ = task::spawn(async move {
-
-        // Master subscription list
-        let subscribe: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
+        // TODO: handle cases were the sesion is not maintained..
 
         // Iterate though all potential subscriptions
-        for item in subscribe.iter() {
+        for item in SUBSCRIBE.iter() {
             // Set up subscription
             let subscription = Subscribe::new(*item, QoS::AtMostOnce);
             tx.send(Request::Subscribe(subscription))
@@ -180,10 +193,10 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
         }
 
         while let Some(event) = reciever.recv().await {
-            // Only process NewOtaPackage eventss
+            // Only process OtaResponse eventss
             match event {
-                Event::NewOtaPackage { uid, package } => {
-                    info!("mqtt_run: Event::NewOtaPackage");
+                Event::OtaResponse { uid, package } => {
+                    info!("mqtt_run: Event::OtaResponse");
 
                     // Serialize this buddy
                     let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
@@ -197,6 +210,7 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
                     info!("Publishing message to {}", &sub_topic);
 
                     // Publish to the UID in question
+                    // TODO: wrap this guy up in a separate spawn so it can get back to work.
                     if let Err(e) = tx.send(Request::Publish(msg)).await {
                         error!("Unable to publish to {}. Error: {}", sub_topic, e);
                     } else {
@@ -208,18 +222,103 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
         }
     });
 
+    // Loop for recieving messages
     loop {
         if let Ok((incoming, _)) = eventloop.poll().await {
-            match incoming {
-                None => {}
-                Some(msg) => {
-                    match msg {
-                        Packet::Publish(msg) => {
-                            println!("Publish = {:?}", msg);
+            // If we have an actual message
+            if incoming.is_some() {
+                // Get the message
+                let msg = incoming.unwrap();
+
+                // Sort it
+                match msg {
+                    // Incoming::Publish is the main thing we're concerned with here..
+                    Incoming::Publish(msg) => {
+                        println!("Publish = {:?}", msg);
+
+                        // Get the uid and topic
+                        let mut topic = msg.topic.split('/');
+                        let uid = topic.next().unwrap_or_default();
+                        let event_type = topic.next().unwrap_or_default();
+                        let pub_sub = topic.next().unwrap_or_default();
+
+                        // Continue if not euql to pub
+                        if pub_sub != "pub" {
+                            warn!("Pubsub not 'pub'. Value: {}", pub_sub);
+                            continue;
                         }
-                        _ => {}
-                    };
-                }
+
+                        match event_type {
+                            "ota" => {
+                                // Get the telemetry data
+                                let res: Result<
+                                    pyrinas_shared::OtaRequest,
+                                    serde_cbor::error::Error,
+                                >;
+
+                                // Get the result
+                                res = serde_cbor::from_slice(msg.payload.as_ref());
+
+                                // Match function to handle error
+                                match res {
+                                    Ok(n) => {
+                                        println!("{:?}", n);
+
+                                        // Send message to broker
+                                        broker_sender
+                                            .send(Event::OtaRequest {
+                                                uid: uid.to_string(),
+                                                msg: n,
+                                            })
+                                            .await
+                                            .unwrap();
+                                    }
+                                    Err(e) => println!("Decode error: {}", e),
+                                }
+                            }
+                            "tel" => {
+                                // Get the telemetry data
+                                let res: Result<
+                                    pyrinas_shared::TelemetryData,
+                                    serde_cbor::error::Error,
+                                >;
+
+                                // Get the result
+                                res = serde_cbor::from_slice(msg.payload.as_ref());
+
+                                // Match function to handle error
+                                match res {
+                                    Ok(n) => {
+                                        println!("{:?}", n);
+                                        // Send data to broker
+                                        broker_sender
+                                            .send(Event::TelemetryData {
+                                                uid: uid.to_string(),
+                                                msg: n,
+                                            })
+                                            .await
+                                            .unwrap();
+                                    }
+                                    Err(e) => println!("Decode error: {}", e),
+                                }
+                            }
+                            "app" => {
+                                // TODO: Deserialize data?
+
+                                // Send data to broker
+                                broker_sender
+                                    .send(Event::ApplicationData {
+                                        uid: uid.to_string(),
+                                        msg: msg.payload,
+                                    })
+                                    .await
+                                    .unwrap();
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                };
             }
         };
     }
@@ -277,7 +376,7 @@ async fn sock_run(mut broker_sender: Sender<Event>) {
 
         // Send result back to broker
         let _ = broker_sender
-            .send(Event::NewOtaPackage {
+            .send(Event::OtaResponse {
                 uid: res.uid,
                 package: res.package,
             })
@@ -303,15 +402,15 @@ async fn broker_run(mut broker_reciever: Receiver<Event>) {
                     }
                 }
             }
-            // Handle NewOtaPackage generated by sock_run
-            Event::NewOtaPackage { uid, package } => {
-                info!("broker_run: Event::NewOtaPackage");
+            // Handle OtaResponse generated by sock_run
+            Event::OtaResponse { uid, package } => {
+                info!("broker_run: Event::OtaResponse");
 
                 // Send to sled
                 runners
                     .get_mut("sled")
                     .unwrap()
-                    .send(Event::NewOtaPackage {
+                    .send(Event::OtaResponse {
                         uid: uid.clone(),
                         package: package.clone(),
                     })
@@ -322,15 +421,113 @@ async fn broker_run(mut broker_reciever: Receiver<Event>) {
                 runners
                     .get_mut("mqtt")
                     .unwrap()
-                    .send(Event::NewOtaPackage {
+                    .send(Event::OtaResponse {
                         uid: uid.clone(),
                         package: package.clone(),
                     })
                     .await
                     .unwrap();
             }
+            Event::OtaRequest { uid: _, msg } => {
+                // TODO: forward request onto sled to look up
+                if msg.cmd == OtaRequestCmd::OtaRequestCheck {
+                    info!("broker_run: RequestCheck");
+                } else if msg.cmd == OtaRequestCmd::OtaRequestDone {
+                    info!("broker_run: RequestDone");
+                }
+            }
+            Event::TelemetryData { uid, msg } => {
+                info!("broker_run: TelemetryData");
+
+                // Send to influx
+                runners
+                    .get_mut("influx")
+                    .unwrap()
+                    .send(Event::TelemetryData {
+                        uid: uid.clone(),
+                        msg: msg.clone(),
+                    })
+                    .await
+                    .unwrap();
+            }
+
             _ => (),
         }
+    }
+}
+
+async fn influx_run(mut broker_sender: Sender<Event>) {
+    // All the vars involved
+    let env_vars = vec![
+        String::from("PYRINAS_INFLUX_HOST"),
+        String::from("PYRINAS_INFLUX_HOST_PORT"),
+        String::from("PYRINAS_INFLUX_DB"),
+        String::from("PYRINAS_INFLUX_USER"),
+        String::from("PYRINAS_INFLUX_PASSWORD"),
+    ];
+
+    // Used for storing temporary array of input params
+    let mut params = HashMap::new();
+
+    // Iterate and get each of the environment variables
+    for item in env_vars.iter() {
+        let ret = dotenv::var(item).unwrap_or_else(|_| {
+            error!("{} must be set in environment!", item);
+            process::exit(1);
+        });
+
+        // Insert ret into map
+        params.insert(item, ret);
+    }
+
+    // Get the sender/reciever associated with this particular task
+    let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+
+    // Register this task
+    broker_sender
+        .send(Event::NewRunner {
+            name: "influx".to_string(),
+            sender: sender.clone(),
+        })
+        .await
+        .unwrap();
+
+    // Set up the URL
+    let host = params.get(&env_vars[0]).unwrap();
+    let port = params.get(&env_vars[1]).unwrap();
+    let url = format!("http://{}:{}", host, port);
+
+    // Get the db params
+    let db_name = params.get(&env_vars[2]).unwrap();
+    let user = params.get(&env_vars[3]).unwrap();
+    let password = params.get(&env_vars[4]).unwrap();
+
+    // Create the client
+    let client = Client::new(url, db_name).with_auth(user, password);
+
+    // Process putting new data away
+    while let Some(event) = reciever.recv().await {
+        // Only process OtaResponse eventss
+        match event {
+            Event::TelemetryData { uid, msg } => {
+                info!("influx_run: TelemetryData");
+
+                // Convert to data used by influx
+                let data = msg.to_influx_data(uid);
+
+                // Query
+                let query = data.into_query("telemetry");
+
+                // Create the query. Shows error if it fails
+                if let Err(e) = client.query(&query).await {
+                    error!("Unable to write query. Error: {}", e);
+                }
+            }
+            Event::ApplicationData { uid: _, msg: _ } => {
+                info!("influx_run: ApplicationData");
+            }
+            _ => (),
+        };
     }
 }
 
@@ -345,7 +542,8 @@ async fn main() {
     // Channels for communication
     let (broker_sender, broker_reciever) = channel::<pyrinas_shared::Event>(100);
 
-    // TODO: init influx connection
+    // Init influx connection
+    let influx_task = task::spawn(influx_run(broker_sender.clone()));
 
     // TODO: init http service
 
@@ -362,7 +560,13 @@ async fn main() {
     let broker_task = task::spawn(broker_run(broker_reciever));
 
     // Join hands kids
-    let _join = tokio::join!(sled_task, unix_sock_task, mqtt_task, broker_task);
+    let _join = tokio::join!(
+        sled_task,
+        influx_task,
+        unix_sock_task,
+        mqtt_task,
+        broker_task
+    );
 
     info!("Done!");
 }
