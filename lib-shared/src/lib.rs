@@ -41,22 +41,6 @@ impl TelemetryData {
     }
 }
 
-// Struct that gets written to Sled
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OTA {
-    pub package: OTAPackage,
-    pub state: OTAState,
-}
-
-// Note: uses special _repr functions for using Enum as int
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone)]
-#[repr(u8)]
-pub enum OTAState {
-    Ready,
-    Started,
-    Complete,
-}
-
 // Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OTAPackage {
@@ -90,6 +74,7 @@ pub enum Event {
     NewRunner { name: String, sender: Sender<Event> },
     OtaNewPackage { uid: String, package: OTAPackage },
     OtaRequest { uid: String, msg: OtaRequest },
+    OtaResponse { uid: String, package: OTAPackage },
     TelemetryData { uid: String, msg: TelemetryData },
     ApplicationData { uid: String, msg: Bytes },
     SledFlush,

@@ -23,7 +23,7 @@ use influxdb::{Client, InfluxDbWriteable};
 use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
 
 // Local lib related
-use pyrinas_shared::{Event, OtaRequestCmd};
+use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd};
 
 // Master subscription list
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
@@ -80,12 +80,39 @@ async fn sled_run(mut broker_sender: Sender<Event>) {
                     OtaRequestCmd::Done => {
                         info!("Done!");
 
-                        // TODO: mark update as complete
+                        // Delete entry from dB
+                        if let Err(e) = tree.remove(&uid) {
+                            error!("Unable to remove {} from OTA database. Error: {}", &uid, e);
+                        }
+
+                        // TODO: send signal to delete it also from S3
                     }
                     OtaRequestCmd::Check => {
                         info!("Check!");
 
-                        // TODO: check if there's a package available and ready
+                        // Check if there's a package available and ready
+                        if let Ok(entry) = tree.get(&uid) {
+                            // Raw data
+                            let data = entry.unwrap();
+                            let data = data.as_ref();
+
+                            // Deserialize it
+                            let package: Result<OTAPackage, serde_cbor::error::Error> =
+                                serde_cbor::de::from_slice(&data);
+                            if package.is_err() {
+                                error!("Unable to deserialize data!");
+                                continue;
+                            }
+
+                            // Send it
+                            broker_sender
+                                .send(Event::OtaResponse {
+                                    uid: uid,
+                                    package: package.unwrap(),
+                                })
+                                .await
+                                .unwrap();
+                        }
                     }
                 }
             }
@@ -93,15 +120,33 @@ async fn sled_run(mut broker_sender: Sender<Event>) {
             Event::OtaNewPackage { uid, package } => {
                 info!("sled_run: Event::OtaNewPackage");
 
+                if let Ok(_) = tree.get(&uid) {
+                    error!("Update already exists for {}.", &uid);
+
+                    // TODO: return error somehow..
+                    continue;
+                }
+
                 // Turn entry.package into CBOR
                 let res = serde_cbor::ser::to_vec_packed(&package);
 
                 // Write into database
                 match res {
                     Ok(cbor_data) => {
-                        if let Err(e) = tree.insert(uid, cbor_data) {
+                        // Check if insert worked ok
+                        if let Err(e) = tree.insert(&uid, cbor_data) {
                             error!("Unable to insert into sled. Error: {}", e);
+                            continue;
                         }
+
+                        // Notify mqtt to send update!
+                        broker_sender
+                            .send(Event::OtaResponse {
+                                uid: uid,
+                                package: package,
+                            })
+                            .await
+                            .unwrap();
                     }
                     Err(e) => {
                         error!("Unable to serialize. Error: {}", e);
@@ -225,8 +270,8 @@ async fn mqtt_run(mut broker_sender: Sender<Event>) {
         while let Some(event) = reciever.recv().await {
             // Only process OtaNewPackage eventss
             match event {
-                Event::OtaNewPackage { uid, package } => {
-                    info!("mqtt_run: Event::OtaNewPackage");
+                Event::OtaResponse { uid, package } => {
+                    info!("mqtt_run: Event::OtaResponse");
 
                     // Serialize this buddy
                     let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
@@ -443,7 +488,8 @@ async fn broker_run(mut broker_reciever: Receiver<Event>) {
                     .send(event.clone())
                     .await
                     .unwrap();
-
+            }
+            Event::OtaResponse { uid: _, package: _ } => {
                 // Send to mqtt
                 runners
                     .get_mut("mqtt")
