@@ -1,7 +1,9 @@
 // Sytem related
-use dotenv;
-use log::{debug, error, info};
-use std::{process, str};
+use log::{debug, info};
+use std::str;
+
+// Config related
+use crate::settings::Settings;
 
 // Tokio Related
 use tokio::io::AsyncReadExt;
@@ -13,12 +15,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use pyrinas_shared::Event;
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(mut broker_sender: Sender<Event>) {
-  let socket_path = dotenv::var("PYRINAS_SOCKET_PATH").unwrap_or_else(|_| {
-    error!("PYRINAS_SOCKET_PATH must be set in environment!");
-    process::exit(1);
-  });
-
+pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, _) = channel::<pyrinas_shared::Event>(20);
 
@@ -34,10 +31,10 @@ pub async fn run(mut broker_sender: Sender<Event>) {
   debug!("Removing previous sock!");
 
   // Remove previous socket
-  let _ = std::fs::remove_file(&socket_path);
+  let _ = std::fs::remove_file(&settings.sock.path);
 
   // Make connection
-  let mut listener = UnixListener::bind(&socket_path).expect("Unable to bind!");
+  let mut listener = UnixListener::bind(&settings.sock.path).expect("Unable to bind!");
   let mut incoming = listener.incoming();
 
   debug!("Created socket listener!");

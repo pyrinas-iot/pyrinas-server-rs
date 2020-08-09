@@ -1,10 +1,12 @@
 // System related
-use dotenv;
 use log::{error, info, warn};
 
 // S3 Bucket related
 use awscreds::Credentials;
-use s3::bucket::Bucket;
+use s3::bucket::Bucket as aws;
+
+// Config related
+use crate::settings::Settings;
 
 // Tokio Related
 use tokio::sync::mpsc::{channel, Sender};
@@ -12,32 +14,11 @@ use tokio::sync::mpsc::{channel, Sender};
 // Local lib related
 use pyrinas_shared::Event;
 
-pub async fn run(mut broker_sender: Sender<Event>) {
-  let aws_access_key = dotenv::var("PYRINAS_AWS_ACCESS_KEY").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_ACCESS_KEY must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_secret_key = dotenv::var("PYRINAS_AWS_SECRET_KEY").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_SECRET_KEY must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_region = dotenv::var("PYRINAS_AWS_REGION").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_REGION must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_bucket = dotenv::var("PYRINAS_AWS_BUCKET").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_BUCKET must be set in environment!");
-    std::process::exit(1);
-  });
-
+pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Set up AWS conection
-  let region = aws_region.parse().expect("Unable to parse AWS region.");
   let credentials = Credentials::new(
-    Some(&aws_access_key),
-    Some(&aws_secret_key),
+    Some(&settings.s3.access_key),
+    Some(&settings.s3.secret_key),
     None,
     None,
     None,
@@ -60,8 +41,16 @@ pub async fn run(mut broker_sender: Sender<Event>) {
     .await
     .unwrap();
 
+  // Parse region
+  let region = settings
+    .s3
+    .region
+    .parse()
+    .expect("Unable to parse AWS region.");
+
   // Create bucket
-  let bucket = Bucket::new(&aws_bucket, region, credentials).expect("Unable to create bucket!");
+  let bucket =
+    aws::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
 
   // Wait for event on reciever
   while let Some(event) = reciever.recv().await {

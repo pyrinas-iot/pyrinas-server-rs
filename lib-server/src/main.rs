@@ -1,5 +1,4 @@
 // Sytem related
-use dotenv;
 use log::info;
 
 // Tokio Related
@@ -8,35 +7,33 @@ use tokio::task;
 
 // Local lib related
 extern crate pyrinas_server;
-use pyrinas_server::{broker, bucket, influx, mqtt, sled, sock};
+use pyrinas_server::{broker, bucket, influx, mqtt, settings, sled, sock};
 
 #[tokio::main()]
 async fn main() {
     // Initialize the logger from the environment
     env_logger::init();
 
-    // Parse .env file
-    dotenv::dotenv().ok();
+    // Parse config file
+    let settings = settings::Settings::new().unwrap();
 
     // Channels for communication
     let (broker_sender, broker_reciever) = channel::<pyrinas_shared::Event>(100);
 
     // Init influx connection
-    let influx_task = task::spawn(influx::run(broker_sender.clone()));
-
-    // TODO: init http service
+    let influx_task = influx::run(settings.clone(), broker_sender.clone());
 
     // Start sled task
-    let bucket_task = task::spawn(bucket::run(broker_sender.clone()));
+    let bucket_task = bucket::run(settings.clone(), broker_sender.clone());
 
     // Start sled task
-    let sled_task = task::spawn(sled::run(broker_sender.clone()));
+    let sled_task = sled::run(settings.clone(), broker_sender.clone());
 
     // Start unix socket task
-    let unix_sock_task = task::spawn(sock::run(broker_sender.clone()));
+    let unix_sock_task = sock::run(settings.clone(), broker_sender.clone());
 
     // Spawn a new task for the MQTT stuff
-    let mqtt_task = task::spawn(mqtt::run(broker_sender.clone()));
+    let mqtt_task = mqtt::run(settings.clone(), broker_sender.clone());
 
     // Spawn the broker task that handles it all!
     let broker_task = task::spawn(broker::run(broker_reciever));

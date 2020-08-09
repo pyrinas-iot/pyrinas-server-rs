@@ -1,7 +1,8 @@
 // System related
-use dotenv;
 use log::{error, info};
-use std::{collections::hash_map::HashMap, process};
+
+// Config related
+use crate::settings::Settings;
 
 // Tokio Related
 use tokio::sync::mpsc::{channel, Sender};
@@ -12,30 +13,7 @@ use influxdb::Client;
 // Local lib related
 use pyrinas_shared::Event;
 
-pub async fn run(mut broker_sender: Sender<Event>) {
-  // All the vars involved
-  let env_vars = vec![
-    String::from("PYRINAS_INFLUX_HOST"),
-    String::from("PYRINAS_INFLUX_HOST_PORT"),
-    String::from("PYRINAS_INFLUX_DB"),
-    String::from("PYRINAS_INFLUX_USER"),
-    String::from("PYRINAS_INFLUX_PASSWORD"),
-  ];
-
-  // Used for storing temporary array of input params
-  let mut params = HashMap::new();
-
-  // Iterate and get each of the environment variables
-  for item in env_vars.iter() {
-    let ret = dotenv::var(item).unwrap_or_else(|_| {
-      error!("{} must be set in environment!", item);
-      process::exit(1);
-    });
-
-    // Insert ret into map
-    params.insert(item, ret);
-  }
-
+pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -49,30 +27,28 @@ pub async fn run(mut broker_sender: Sender<Event>) {
     .unwrap();
 
   // Set up the URL
-  let host = params.get(&env_vars[0]).unwrap();
-  let port = params.get(&env_vars[1]).unwrap();
-  let url = format!("http://{}:{}", host, port);
-
-  // Get the db params
-  let db_name = params.get(&env_vars[2]).unwrap();
-  let user = params.get(&env_vars[3]).unwrap();
-  let password = params.get(&env_vars[4]).unwrap();
+  let url = format!("http://{}:{}", settings.influx.host, settings.influx.port);
 
   // Create the client
-  let client = Client::new(url, db_name).with_auth(user, password);
+  let client = Client::new(url, settings.influx.database.clone()).with_auth(
+    settings.influx.user.clone(),
+    settings.influx.password.clone(),
+  );
 
   // Process putting new data away
   while let Some(event) = reciever.recv().await {
     // Process telemetry and app data
     match event {
       Event::InfluxDataSave { query } => {
-        info!("influx_run: ApplicationData");
+        info!("influx_run: InfluxDataSave");
         // Create the query. Shows error if it fails
         if let Err(e) = client.query(&query).await {
           error!("Unable to write query. Error: {}", e);
         }
       }
-      Event::InfluxDataRequest { query: _ } => {}
+      Event::InfluxDataRequest { query: _ } => {
+        info!("influx_run: InfluxDataRequest");
+      }
       _ => (),
     };
   }

@@ -1,7 +1,10 @@
-use dotenv;
+// System Related
 use log::{debug, error, info, warn};
-use std::process;
 
+// Config related
+use crate::settings::Settings;
+
+// Tokio related
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::time::{delay_for, Duration};
 
@@ -34,7 +37,8 @@ fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
   }
 }
 
-pub async fn run(mut broker_sender: Sender<Event>) {
+// Only requires a sender. No response necessary here... yet.
+pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (mut sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -47,13 +51,8 @@ pub async fn run(mut broker_sender: Sender<Event>) {
     .await
     .unwrap();
 
-  let sled_db = dotenv::var("PYRINAS_SLED_DB").unwrap_or_else(|_| {
-    error!("PYRINAS_SLED_DB must be set in environment!");
-    process::exit(1);
-  });
-
   // Open the DB
-  let tree = sled::open(sled_db).expect("Error opening sled db.");
+  let tree = sled::open(&settings.sled.path).expect("Error opening sled db.");
 
   // TODO: smarter way to do this?
   tokio::spawn(async move {

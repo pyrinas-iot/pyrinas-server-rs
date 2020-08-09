@@ -1,5 +1,4 @@
 // Sytem related
-use dotenv;
 use log::{error, info, warn};
 use std::fs::File;
 use std::io::Read;
@@ -8,6 +7,9 @@ use std::{env, process};
 // Tokio async related
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::task;
+
+// Config related
+use crate::settings::Settings;
 
 // MQTT related
 use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
@@ -18,34 +20,7 @@ use pyrinas_shared::Event;
 // Master subscription list
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
 
-pub async fn run(mut broker_sender: Sender<Event>) {
-  let ca_cert_env = dotenv::var("PYRINAS_CA_CERT").unwrap_or_else(|_| {
-    error!("PYRINAS_CA_CERT must be set in environment!");
-    process::exit(1);
-  });
-
-  let server_cert_env = dotenv::var("PYRINAS_SERVER_CERT").unwrap_or_else(|_| {
-    error!("PYRINAS_SERVER_CERT must be set in environment!");
-    process::exit(1);
-  });
-
-  let private_key_env = dotenv::var("PYRINAS_PRIVATE_KEY").unwrap_or_else(|_| {
-    error!("PYRINAS_PRIVATE_KEY must be set in environment!");
-    process::exit(1);
-  });
-
-  // Let the user override the host, but note the "ssl://" protocol.
-  let host = dotenv::var("PYRINAS_MQTT_HOST").unwrap_or_else(|_| {
-    error!("PYRINAS_MQTT_HOST must be set in environment!");
-    process::exit(1);
-  });
-
-  // Port
-  let port = dotenv::var("PYRINAS_MQTT_HOST_PORT").unwrap_or_else(|_| {
-    error!("PYRINAS_MQTT_HOST_PORT must be set in environment!");
-    process::exit(1);
-  });
-
+pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -60,13 +35,13 @@ pub async fn run(mut broker_sender: Sender<Event>) {
 
   // We assume that we are in a valid directory.
   let mut ca_cert = env::current_dir().unwrap();
-  ca_cert.push(ca_cert_env);
+  ca_cert.push(settings.mqtt.ca_cert.clone());
 
   let mut server_cert = env::current_dir().unwrap();
-  server_cert.push(server_cert_env);
+  server_cert.push(settings.mqtt.server_cert.clone());
 
   let mut private_key = env::current_dir().unwrap();
-  private_key.push(private_key_env);
+  private_key.push(settings.mqtt.private_key.clone());
 
   if !ca_cert.exists() {
     error!("The trust store file does not exist: {:?}", ca_cert);
@@ -105,7 +80,11 @@ pub async fn run(mut broker_sender: Sender<Event>) {
     .expect("Unable to read to end");
 
   // Create the options for the Mqtt client
-  let mut opt = MqttOptions::new("server", host, port.parse::<u16>().unwrap());
+  let mut opt = MqttOptions::new(
+    "server",
+    settings.mqtt.host.clone(),
+    settings.mqtt.port.parse::<u16>().unwrap(),
+  );
   opt.set_keep_alive(120);
   // TODO: add these back when things are working again...
   // opt.set_ca(ca_cert_buf);
