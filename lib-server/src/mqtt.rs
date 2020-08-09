@@ -133,6 +133,25 @@ pub async fn run(mut broker_sender: Sender<Event>) {
     while let Some(event) = reciever.recv().await {
       // Only process OtaNewPackage eventss
       match event {
+        Event::ApplicationResponse { uid, msg } => {
+          info!("mqtt::run Event::ApplicationResponse");
+
+          // Generate topic
+          let sub_topic = format!("{}/app/sub", uid);
+
+          // Create a new message
+          let out = Publish::new(&sub_topic, QoS::AtLeastOnce, msg);
+
+          info!("Publishing application message to {}", &sub_topic);
+
+          // Publish to the UID in question
+          // TODO: wrap this guy up in a separate spawn so it can get back to work.
+          if let Err(e) = tx.send(Request::Publish(out)).await {
+            error!("Unable to publish to {}. Error: {}", sub_topic, e);
+          } else {
+            info!("Published..");
+          }
+        }
         Event::OtaResponse { uid, package } => {
           info!("mqtt_run: Event::OtaResponse");
 
@@ -222,12 +241,15 @@ pub async fn run(mut broker_sender: Sender<Event>) {
                 match res {
                   Ok(n) => {
                     println!("{:?}", n);
+
+                    // Create query
+                    let query = n
+                      .to_influx_data(uid.to_string())
+                      .to_influx_query("telemetry".to_string());
+
                     // Send data to broker
                     broker_sender
-                      .send(Event::TelemetryData {
-                        uid: uid.to_string(),
-                        msg: n,
-                      })
+                      .send(Event::InfluxDataSave { query: query })
                       .await
                       .unwrap();
                   }
@@ -235,13 +257,11 @@ pub async fn run(mut broker_sender: Sender<Event>) {
                 }
               }
               "app" => {
-                // TODO: Deserialize data?
-
                 // Send data to broker
                 broker_sender
-                  .send(Event::ApplicationData {
+                  .send(Event::ApplicationRequest {
                     uid: uid.to_string(),
-                    msg: msg.payload,
+                    msg: msg.payload.to_vec(),
                   })
                   .await
                   .unwrap();

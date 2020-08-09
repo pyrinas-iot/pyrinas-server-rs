@@ -58,8 +58,8 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
           .await
           .unwrap();
       }
-      Event::TelemetryData { uid: _, msg: _ } => {
-        info!("broker_run: TelemetryData");
+      Event::InfluxDataSave { query: _ } => {
+        info!("broker_run: InfluxDataSave");
 
         // Send to influx
         runners

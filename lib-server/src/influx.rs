@@ -7,7 +7,7 @@ use std::{collections::hash_map::HashMap, process};
 use tokio::sync::mpsc::{channel, Sender};
 
 // Influx Related
-use influxdb::{Client, InfluxDbWriteable};
+use influxdb::Client;
 
 // Local lib related
 use pyrinas_shared::Event;
@@ -65,23 +65,14 @@ pub async fn run(mut broker_sender: Sender<Event>) {
   while let Some(event) = reciever.recv().await {
     // Process telemetry and app data
     match event {
-      Event::TelemetryData { uid, msg } => {
-        info!("influx_run: TelemetryData");
-
-        // Convert to data used by influx
-        let data = msg.to_influx_data(uid);
-
-        // Query
-        let query = data.into_query("telemetry");
-
+      Event::InfluxDataSave { query } => {
+        info!("influx_run: ApplicationData");
         // Create the query. Shows error if it fails
         if let Err(e) = client.query(&query).await {
           error!("Unable to write query. Error: {}", e);
         }
       }
-      Event::ApplicationData { uid: _, msg: _ } => {
-        info!("influx_run: ApplicationData");
-      }
+      Event::InfluxDataRequest { query: _ } => {}
       _ => (),
     };
   }

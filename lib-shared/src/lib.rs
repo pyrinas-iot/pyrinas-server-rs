@@ -1,7 +1,5 @@
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use influxdb::InfluxDbWriteable;
-use influxdb::Timestamp;
+use influxdb::{InfluxDbWriteable, ReadQuery, Timestamp, WriteQuery};
 use serde_derive::{Deserialize, Serialize};
 use serde_repr::*;
 use tokio::sync::mpsc::Sender;
@@ -17,7 +15,7 @@ pub struct TelemetryData {
     rssi_client: Option<i32>, // Won't always have this guy either
 }
 
-#[derive(Debug, InfluxDbWriteable)]
+#[derive(Debug, InfluxDbWriteable, Clone)]
 pub struct InfluxTelemetryData {
     version: String,
     rsrp: Option<u32>,        // Won't always have rsrp (hub only)
@@ -30,6 +28,7 @@ pub struct InfluxTelemetryData {
 
 impl TelemetryData {
     pub fn to_influx_data(&self, uid: String) -> InfluxTelemetryData {
+        // Return new data structure that's friendly with Influx
         InfluxTelemetryData {
             version: self.version.clone(),
             rsrp: self.rsrp,
@@ -38,6 +37,14 @@ impl TelemetryData {
             id: uid,
             time: Timestamp::Now.into(),
         }
+    }
+}
+
+impl InfluxTelemetryData {
+    pub fn to_influx_query(&self, category: String) -> WriteQuery {
+        // Create and return query
+        let data = self.clone();
+        data.into_query(category)
     }
 }
 
@@ -72,12 +79,15 @@ pub enum OtaRequestCmd {
 #[derive(Debug, Clone)]
 pub enum Event {
     NewRunner { name: String, sender: Sender<Event> },
+    OtaDeletePackage { uid: String, package: OTAPackage },
     OtaNewPackage { uid: String, package: OTAPackage },
     OtaRequest { uid: String, msg: OtaRequest },
     OtaResponse { uid: String, package: OTAPackage },
-    TelemetryData { uid: String, msg: TelemetryData },
-    ApplicationData { uid: String, msg: Bytes },
-    OtaDeletePackage { uid: String, package: OTAPackage },
+    ApplicationRequest { uid: String, msg: Vec<u8> }, // Request/event from a device
+    ApplicationResponse { uid: String, msg: Vec<u8> }, // Reponse from other parts of the server
+    InfluxDataSave { query: WriteQuery },             // Takes a pre-prepared query and executes it
+    InfluxDataRequest { query: ReadQuery }, // Takes a pre-prepared query to *read* the database
+    InfluxDataResponse,                     // Is the response to InfluxDataRequest
     SledFlush,
 }
 
