@@ -170,7 +170,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
         match msg {
           // Incoming::Publish is the main thing we're concerned with here..
           Incoming::Publish(msg) => {
-            println!("Publish = {:?}", msg);
+            info!("Publish = {:?}", msg);
 
             // Get the uid and topic
             let mut topic = msg.topic.split('/');
@@ -195,7 +195,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 // Match function to handle error
                 match res {
                   Ok(n) => {
-                    println!("{:?}", n);
+                    info!("{:?}", n);
 
                     // Send message to broker
                     broker_sender
@@ -219,7 +219,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 // Match function to handle error
                 match res {
                   Ok(n) => {
-                    println!("{:?}", n);
+                    info!("{:?}", n);
 
                     // Create query
                     let query = n
