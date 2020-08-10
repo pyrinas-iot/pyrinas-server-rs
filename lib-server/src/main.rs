@@ -5,17 +5,31 @@ use log::info;
 use tokio::sync::mpsc::channel;
 use tokio::task;
 
+// Command line parsing
+use clap::{crate_version, Clap};
+
 // Local lib related
 extern crate pyrinas_server;
 use pyrinas_server::{broker, bucket, influx, mqtt, settings, sled, sock};
+
+/// This doc string acts as a help message when the user runs '--help'
+/// as do all doc strings on fields
+#[derive(Clap)]
+#[clap(version = crate_version!())]
+struct Opts {
+    config: String,
+}
 
 #[tokio::main()]
 async fn main() {
     // Initialize the logger from the environment
     env_logger::init();
 
+    // Get the config path
+    let opts: Opts = Opts::parse();
+
     // Parse config file
-    let settings = settings::Settings::new().unwrap();
+    let settings = settings::Settings::new(opts.config).unwrap();
 
     // Channels for communication
     let (broker_sender, broker_reciever) = channel::<pyrinas_shared::Event>(100);
