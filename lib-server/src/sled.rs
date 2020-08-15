@@ -78,7 +78,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
       }
       // Process OtaRequests
       Event::OtaRequest { uid, msg } => {
-        info!("sled_run: Event::OtaRequest");
+        debug!("sled_run: Event::OtaRequest");
 
         // Do something different depending on the situation
         match msg.cmd {
@@ -110,7 +110,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
             }
           }
           OtaRequestCmd::Check => {
-            info!("Check!");
+            debug!("Check!");
 
             // Check if there's a package available and ready
             let package = get_ota_package(&tree, &uid);
@@ -135,7 +135,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
       }
       // Pprocess OtaNewPackage events
       Event::OtaNewPackage { uid, package } => {
-        info!("sled_run: Event::OtaNewPackage");
+        debug!("sled_run: Event::OtaNewPackage");
 
         if let Ok(entry) = tree.get(&uid) {
           // Get the u8 data

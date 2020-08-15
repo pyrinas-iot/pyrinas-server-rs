@@ -1,5 +1,5 @@
 // Sytem related
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::fs::File;
 use std::io::Read;
 use std::{env, process};
@@ -18,7 +18,7 @@ use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Sub
 use pyrinas_shared::Event;
 
 // Master subscription list
-const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub"];
+const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/+"];
 
 pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
@@ -170,7 +170,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
         match msg {
           // Incoming::Publish is the main thing we're concerned with here..
           Incoming::Publish(msg) => {
-            info!("Publish = {:?}", msg);
+            debug!("Publish = {:?}", msg);
 
             // Get the uid and topic
             let mut topic = msg.topic.split('/');
@@ -236,6 +236,8 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 }
               }
               "app" => {
+                info!("app: from:{:?}", uid.to_string());
+
                 // Send data to broker
                 broker_sender
                   .send(Event::ApplicationRequest {

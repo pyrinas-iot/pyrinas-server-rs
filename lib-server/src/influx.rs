@@ -1,5 +1,5 @@
 // System related
-use log::{error, info};
+use log::{debug, error};
 
 // Config related
 use crate::settings::Settings;
@@ -40,14 +40,14 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     // Process telemetry and app data
     match event {
       Event::InfluxDataSave { query } => {
-        info!("influx_run: InfluxDataSave");
+        debug!("influx_run: InfluxDataSave");
         // Create the query. Shows error if it fails
         if let Err(e) = client.query(&query).await {
           error!("Unable to write query. Error: {}", e);
         }
       }
       Event::InfluxDataRequest { query: _ } => {
-        info!("influx_run: InfluxDataRequest");
+        debug!("influx_run: InfluxDataRequest");
       }
       _ => (),
     };

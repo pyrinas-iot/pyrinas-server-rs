@@ -1,0 +1,25 @@
+[influx]
+database = "<DATABASE NAME>"
+host = "<IP>"
+password = "<PASSWORD>"
+port = "8086"
+user = "<USER>"
+
+[mqtt]
+ca_cert = "ca.crt"
+host = "<IP>"
+port = "1883"
+private_key = "rust-server.key"
+server_cert = "rust-server.crt"
+
+[sock]
+path = "/tmp/pyrinas.sock"
+
+[s3]
+access_key = "<KEY>"
+bucket = "<BUCKET>"
+region = "us-east-1"
+secret_key = "<SECRET KEY>"
+
+[sled]
+path = "./sled.db"

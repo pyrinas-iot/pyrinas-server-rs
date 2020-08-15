@@ -1,5 +1,6 @@
 use config::{Config, ConfigError, File};
 use serde_derive::Deserialize;
+use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Mqtt {
@@ -47,11 +48,14 @@ pub struct Settings {
 }
 
 impl Settings {
-  pub fn new() -> Result<Self, ConfigError> {
+  pub fn new(config: String) -> Result<Self, ConfigError> {
     let mut s = Config::new();
 
+    // Get the path
+    let path = Path::new(&config);
+
     // Get the configuration file
-    s.merge(File::with_name("config"))?;
+    s.merge(File::from(path))?;
 
     // You can deserialize (and thus freeze) the entire configuration as
     s.try_into()
