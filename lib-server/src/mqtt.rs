@@ -112,7 +112,11 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     while let Some(event) = reciever.recv().await {
       // Only process OtaNewPackage eventss
       match event {
-        Event::ApplicationResponse { uid, target: _, msg } => {
+        Event::ApplicationResponse {
+          uid,
+          target: _,
+          msg,
+        } => {
           info!("mqtt::run Event::ApplicationResponse");
 
           // Generate topic
@@ -207,7 +211,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                       .await
                       .unwrap();
                   }
-                  Err(e) => println!("Decode error: {}", e),
+                  Err(e) => error!("OTA decode error: {}", e),
                 }
               }
               "tel" => {
@@ -233,7 +237,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                       .await
                       .unwrap();
                   }
-                  Err(e) => println!("Decode error: {}", e),
+                  Err(e) => error!("Telemetry decode error: {}", e),
                 }
               }
               "app" => {
