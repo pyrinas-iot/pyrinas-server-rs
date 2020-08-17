@@ -52,7 +52,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     .unwrap();
 
   // Open the DB
-  let tree = sled::open(&settings.sled.path).expect("Error opening sled db.");
+  let tree = sled::open(&settings.ota_db.path).expect("Error opening sled db.");
 
   // TODO: smarter way to do this?
   tokio::spawn(async move {

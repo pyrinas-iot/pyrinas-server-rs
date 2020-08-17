@@ -34,7 +34,7 @@ pub struct S3 {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Sled {
+pub struct OtaDb {
   pub path: String,
 }
 
@@ -44,7 +44,7 @@ pub struct Settings {
   pub mqtt: Mqtt,
   pub sock: Sock,
   pub s3: S3,
-  pub sled: Sled,
+  pub ota_db: OtaDb,
 }
 
 impl Settings {

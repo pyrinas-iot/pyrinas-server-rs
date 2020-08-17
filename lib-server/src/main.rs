@@ -10,7 +10,7 @@ use clap::{crate_version, Clap};
 
 // Local lib related
 extern crate pyrinas_server;
-use pyrinas_server::{broker, bucket, influx, mqtt, settings, sled, sock};
+use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, settings, sock};
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
@@ -41,7 +41,7 @@ async fn main() {
     let bucket_task = bucket::run(settings.clone(), broker_sender.clone());
 
     // Start sled task
-    let sled_task = sled::run(settings.clone(), broker_sender.clone());
+    let ota_db_task = ota_db::run(settings.clone(), broker_sender.clone());
 
     // Start unix socket task
     let unix_sock_task = sock::run(settings.clone(), broker_sender.clone());
@@ -54,7 +54,7 @@ async fn main() {
 
     // Join hands kids
     let _join = tokio::join!(
-        sled_task,
+        ota_db_task,
         influx_task,
         unix_sock_task,
         mqtt_task,

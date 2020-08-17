@@ -112,7 +112,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     while let Some(event) = reciever.recv().await {
       // Only process OtaNewPackage eventss
       match event {
-        Event::ApplicationResponse { uid, msg } => {
+        Event::ApplicationResponse { uid, target: _, msg } => {
           info!("mqtt::run Event::ApplicationResponse");
 
           // Generate topic
@@ -177,6 +177,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
             let uid = topic.next().unwrap_or_default();
             let event_type = topic.next().unwrap_or_default();
             let pub_sub = topic.next().unwrap_or_default();
+            let target = topic.next().unwrap_or_default();
 
             // Continue if not euql to pub
             if pub_sub != "pub" {
@@ -242,6 +243,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 broker_sender
                   .send(Event::ApplicationRequest {
                     uid: uid.to_string(),
+                    target: target.to_string(),
                     msg: msg.payload.to_vec(),
                   })
                   .await

@@ -1,5 +1,5 @@
 // System related
-use log::{debug, info};
+use log::{debug};
 use std::collections::hash_map::{Entry, HashMap};
 
 // Tokio related
@@ -80,7 +80,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
           .await
           .unwrap();
       }
-      Event::ApplicationRequest { uid: _, msg: _ } => {
+      Event::ApplicationRequest { uid: _, target: _, msg: _ } => {
         debug!("broker_run: ApplicationRequest");
 
         // Send to bucket handler
