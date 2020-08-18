@@ -112,15 +112,11 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     while let Some(event) = reciever.recv().await {
       // Only process OtaNewPackage eventss
       match event {
-        Event::ApplicationResponse {
-          uid,
-          target: _,
-          msg,
-        } => {
+        Event::ApplicationResponse { uid, target, msg } => {
           info!("mqtt::run Event::ApplicationResponse");
 
           // Generate topic
-          let sub_topic = format!("{}/app/sub", uid);
+          let sub_topic = format!("{}/app/sub/{}", uid, target);
 
           // Create a new message
           let out = Publish::new(&sub_topic, QoS::AtLeastOnce, msg);

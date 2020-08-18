@@ -83,9 +83,19 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
       Event::ApplicationRequest { uid: _, target: _, msg: _ } => {
         debug!("broker_run: ApplicationRequest");
 
-        // Send to bucket handler
+        // Send to app handler
         runners
           .get_mut("app")
+          .unwrap()
+          .send(event.clone())
+          .await
+          .unwrap();
+      }
+      Event::ApplicationResponse{ uid: _, target: _, msg: _ } => {
+        debug!("broker_run: ApplicationResponse");
+        // Send to mqtt handler
+        runners
+          .get_mut("mqtt")
           .unwrap()
           .send(event.clone())
           .await
