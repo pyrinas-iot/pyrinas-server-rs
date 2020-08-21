@@ -170,7 +170,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
         match msg {
           // Incoming::Publish is the main thing we're concerned with here..
           Incoming::Publish(msg) => {
-            info!("Publish = {:?}", msg);
+            debug!("Publish = {:?}", msg);
 
             // Get the uid and topic
             let mut topic = msg.topic.split('/');

@@ -16,7 +16,6 @@ env_logger = "^0.7" # logging message control using env variable
 log = "^0.4.11" # logging messages
 rust-s3 = "^0.22.12" # Handling upload of files
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
-serde_derive = "^1.0" # Serializing/deserializing
 serde_json = "^1.0" 
 
 [dependencies.pyrinas-shared]
