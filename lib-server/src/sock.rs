@@ -1,5 +1,5 @@
 // Sytem related
-use log::{debug, info};
+use log::{debug, info, error};
 use std::str;
 
 // Config related
@@ -50,21 +50,40 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     stream
       .read_to_end(&mut buffer)
       .await
-      .expect("Unable to write to socket.");
+      .expect("Unable to read from socket.");
+
+    // If no message, then continue
+    if buffer.len() <= 0 {
+      error!("No message received over socket");
+      continue;
+    }
 
     // Get string from the buffer
     let s = str::from_utf8(&buffer).unwrap();
     info!("{}", s);
 
     // Decode into struct
-    let res: pyrinas_shared::NewOta = serde_json::from_str(&s).unwrap();
+    let res: Result<pyrinas_shared::NewOta, serde_json::error::Error> = serde_json::from_str(&s);
 
-    // Send result back to broker
-    let _ = broker_sender
-      .send(Event::OtaNewPackage {
-        uid: res.uid,
-        package: res.package,
-      })
-      .await;
+    match res {
+      Ok(r) => {
+
+      // Send result back to broker
+      let _ = broker_sender
+        .send(Event::OtaNewPackage {
+          uid: r.uid,
+          package: r.package,
+        })
+        .await;
+
+      }
+      Err(e) => {
+        error!("Unable to decode json from socket. Error: {}",e);
+        continue;
+      }
+
+    }
+
+
   }
 }
