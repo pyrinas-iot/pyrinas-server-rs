@@ -1,14 +1,10 @@
-use awscreds::Credentials;
-use chrono::Utc;
 use clap::{crate_version, Clap};
 use log::error;
+use pyrinas_cli::ota;
 use pyrinas_shared::settings;
-use s3::bucket::Bucket;
-use std::fs::File;
 use std::io::prelude::*;
 use std::net::Shutdown;
 use std::os::unix::net::UnixStream;
-use std::path::Path;
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
@@ -58,28 +54,6 @@ fn main() {
     std::process::exit(1);
   });
 
-  // Set up AWS conection
-  let credentials = Credentials::new_blocking(
-    Some(&settings.s3.access_key),
-    Some(&settings.s3.secret_key),
-    None,
-    None,
-    None,
-  )
-  .unwrap_or_else(|e| {
-    error!("Unable to create AWS credentials! {}", e);
-    std::process::exit(1);
-  });
-
-  // Create bucket
-  let region = settings
-    .s3
-    .region
-    .parse()
-    .expect("Unable to parse AWS region.");
-  let bucket =
-    Bucket::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
-
   // Connect to unix socket
   let mut stream = UnixStream::connect(&settings.sock.path).unwrap_or_else(|_| {
     println!(
@@ -93,39 +67,8 @@ fn main() {
     SubCommand::Add(s) => {
       println!("Adding new update for: {} on device: {}", s.file, s.uid);
 
-      // Get current Datetime
-      let timestamp = Utc::now().timestamp();
-
-      // Open and upload file
-      let path = Path::new(&s.file);
-      if !path.exists() {
-        error!("{} not found!", path.to_str().unwrap());
-        std::process::exit(1);
-      }
-      // Get the filename
-      let filename = path.file_name().unwrap().to_str().unwrap();
-
-      // Create the target file name
-      let server_filename = format!("{}_{}_{}", s.uid, timestamp, filename);
-
-      // Open the file
-      let mut file = File::open(path).expect("Unable to open file!");
-
-      let mut buffer = Vec::new();
-      // read the whole file
-      file
-        .read_to_end(&mut buffer)
-        .expect("Unable to read to end");
-
-      // Upload file to AWS
-      let (_, status_code) = bucket
-        .put_object_blocking(&server_filename, &buffer, "application/octet-stream")
-        .unwrap_or_else(|e| {
-          error!("Unable to upload {}! Error: {}", &server_filename, e);
-          std::process::exit(1);
-        });
-
-      assert_eq!(200, status_code);
+      // Upload to AWS
+      let ota_info = ota::upload_ota_to_aws(&settings, &s.file, &s.uid);
 
       // TODO: this can be used in the server..
       // let url = bucket.presign_put(filename, 180).unwrap_or_else(|e| {
@@ -143,7 +86,7 @@ fn main() {
         package: pyrinas_shared::OTAPackage {
           version: s.version,
           host: file_host,
-          file: server_filename,
+          file: ota_info.server_filename,
           force: s.force,
         },
       };
