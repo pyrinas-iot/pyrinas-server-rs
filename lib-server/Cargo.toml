@@ -10,19 +10,14 @@ version = "0.1.0"
 aws-creds = "^0.22.2" 
 aws-region = "^0.21.0" 
 clap = "~3.0.0-beta.1" # CLI Library
-config = {git = "https://github.com/mehcode/config-rs", rev = "2c0b2010"}# Used for reading configuration file 
 env_logger = "^0.7" # logging message control using env variable
 influxdb = {git = "https://github.com/Empty2k12/influxdb-rust", rev = "056681190af7535daccbf24fe04b06f770733f5a", features = ["derive"]}# InfluxDB access 
 log = "^0.4.11" # logging messages
+pyrinas-shared = {path = "../lib-shared/"}# Local shared for settings, etc 
 rumqttc = {git = "https://github.com/bytebeamio/rumqtt", rev = "2121d7fb"}# Mqtt core bits 
 rust-s3 = "^0.22.12" # Handling upload of files
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
 serde_json = "^1.0" # Serializing/deserializing json
 sled = "^0.34.0" # Storing events as KV store
-tokio = {version = "0.2.22", features = ["uds", "io-util"]} 
-
-[dependencies.pyrinas-shared]
-path = "../lib-shared/"
-
-# Web library -- for handling requests from APP
+tokio = {version = "0.2.22", features = ["uds", "io-util"]}

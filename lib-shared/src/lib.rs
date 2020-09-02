@@ -1,3 +1,5 @@
+pub mod settings;
+
 use chrono::{DateTime, Utc};
 use influxdb::{InfluxDbWriteable, ReadQuery, Timestamp, WriteQuery};
 use serde::{Deserialize, Serialize};
@@ -78,16 +80,43 @@ pub enum OtaRequestCmd {
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    NewRunner { name: String, sender: Sender<Event> },
-    OtaDeletePackage { uid: String, package: OTAPackage },
-    OtaNewPackage { uid: String, package: OTAPackage },
-    OtaRequest { uid: String, msg: OtaRequest },
-    OtaResponse { uid: String, package: OTAPackage },
-    ApplicationRequest { uid: String, target: String, msg: Vec<u8> }, // Request/event from a device
-    ApplicationResponse { uid: String, target: String, msg: Vec<u8> }, // Reponse from other parts of the server
-    InfluxDataSave { query: WriteQuery },             // Takes a pre-prepared query and executes it
-    InfluxDataRequest { query: ReadQuery }, // Takes a pre-prepared query to *read* the database
-    InfluxDataResponse,                     // Is the response to InfluxDataRequest
+    NewRunner {
+        name: String,
+        sender: Sender<Event>,
+    },
+    OtaDeletePackage {
+        uid: String,
+        package: OTAPackage,
+    },
+    OtaNewPackage {
+        uid: String,
+        package: OTAPackage,
+    },
+    OtaRequest {
+        uid: String,
+        msg: OtaRequest,
+    },
+    OtaResponse {
+        uid: String,
+        package: OTAPackage,
+    },
+    ApplicationRequest {
+        uid: String,
+        target: String,
+        msg: Vec<u8>,
+    }, // Request/event from a device
+    ApplicationResponse {
+        uid: String,
+        target: String,
+        msg: Vec<u8>,
+    }, // Reponse from other parts of the server
+    InfluxDataSave {
+        query: WriteQuery,
+    }, // Takes a pre-prepared query and executes it
+    InfluxDataRequest {
+        query: ReadQuery,
+    }, // Takes a pre-prepared query to *read* the database
+    InfluxDataResponse, // Is the response to InfluxDataRequest
     SledFlush,
 }
 

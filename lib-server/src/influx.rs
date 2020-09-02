@@ -2,7 +2,7 @@
 use log::{debug, error};
 
 // Config related
-use crate::settings::Settings;
+use pyrinas_shared::settings::Settings;
 
 // Tokio Related
 use tokio::sync::mpsc::{channel, Sender};

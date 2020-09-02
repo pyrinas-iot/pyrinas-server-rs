@@ -6,7 +6,7 @@ use awscreds::Credentials;
 use s3::bucket::Bucket as aws;
 
 // Config related
-use crate::settings::Settings;
+use pyrinas_shared::settings::Settings;
 
 // Tokio Related
 use tokio::sync::mpsc::{channel, Sender};

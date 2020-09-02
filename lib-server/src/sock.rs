@@ -3,7 +3,7 @@ use log::{debug, info};
 use std::str;
 
 // Config related
-use crate::settings::Settings;
+use pyrinas_shared::settings::Settings;
 
 // Tokio Related
 use tokio::io::AsyncReadExt;

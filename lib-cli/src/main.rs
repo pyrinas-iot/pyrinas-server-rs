@@ -1,8 +1,8 @@
 use awscreds::Credentials;
 use chrono::Utc;
 use clap::{crate_version, Clap};
-use dotenv;
 use log::error;
+use pyrinas_shared::settings;
 use s3::bucket::Bucket;
 use std::fs::File;
 use std::io::prelude::*;
@@ -15,6 +15,8 @@ use std::path::Path;
 #[derive(Clap)]
 #[clap(version = crate_version!())]
 struct Opts {
+  #[clap(short, long, default_value = "config.toml")]
+  config: String,
   #[clap(subcommand)]
   subcmd: SubCommand,
 }
@@ -44,52 +46,22 @@ struct OtaAdd {
 }
 
 fn main() {
+  // Opts from CLI
   let opts: Opts = Opts::parse();
 
   // Init logger
   env_logger::init();
 
-  // Parse .env file
-  dotenv::dotenv().unwrap_or_else(|e| {
-    error!("dotnev parsing failed! {}", e);
-    std::process::exit(1);
-  });
-
-  let socket = dotenv::var("PYRINAS_SOCKET_PATH").unwrap_or_else(|_| {
-    error!("PYRINAS_SOCKET_PATH must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let file_host = dotenv::var("PYRINAS_FILE_HOST").unwrap_or_else(|_| {
-    error!("PYRINAS_FILE_HOST must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_access_key = dotenv::var("PYRINAS_AWS_ACCESS_KEY").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_ACCESS_KEY must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_secret_key = dotenv::var("PYRINAS_AWS_SECRET_KEY").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_SECRET_KEY must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_region = dotenv::var("PYRINAS_AWS_REGION").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_REGION must be set in environment!");
-    std::process::exit(1);
-  });
-
-  let aws_bucket = dotenv::var("PYRINAS_AWS_BUCKET").unwrap_or_else(|_| {
-    error!("PYRINAS_AWS_BUCKET must be set in environment!");
+  // Parse config file
+  let settings = settings::Settings::new(opts.config.clone()).unwrap_or_else(|e| {
+    error!("Unable to parse config at: {}. Error: {}", &opts.config, e);
     std::process::exit(1);
   });
 
   // Set up AWS conection
-  let region = aws_region.parse().expect("Unable to parse AWS region.");
   let credentials = Credentials::new_blocking(
-    Some(&aws_access_key),
-    Some(&aws_secret_key),
+    Some(&settings.s3.access_key),
+    Some(&settings.s3.secret_key),
     None,
     None,
     None,
@@ -100,11 +72,20 @@ fn main() {
   });
 
   // Create bucket
-  let bucket = Bucket::new(&aws_bucket, region, credentials).expect("Unable to create bucket!");
+  let region = settings
+    .s3
+    .region
+    .parse()
+    .expect("Unable to parse AWS region.");
+  let bucket =
+    Bucket::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
 
   // Connect to unix socket
-  let mut stream = UnixStream::connect(&socket).unwrap_or_else(|_| {
-    println!("Unable to connect to {}. Server started?", socket);
+  let mut stream = UnixStream::connect(&settings.sock.path).unwrap_or_else(|_| {
+    println!(
+      "Unable to connect to {}. Server started?",
+      &settings.sock.path
+    );
     std::process::exit(1);
   });
 
@@ -153,6 +134,9 @@ fn main() {
       // });
       // println!("Presigned url: {}", url);
 
+      // Get host name
+      let file_host = format!("https://{}.s3.amazonaws.com/", &settings.s3.bucket);
+
       // Data structure (from pyrinas_shared)
       let new = pyrinas_shared::NewOta {
         uid: s.uid,
@@ -171,7 +155,7 @@ fn main() {
 
       // Send over socket
       stream.write_all(&j.into_bytes()).unwrap_or_else(|_| {
-        println!("Unable to write to {}.", socket);
+        println!("Unable to write to {}.", &settings.sock.path);
         std::process::exit(1);
       });
 

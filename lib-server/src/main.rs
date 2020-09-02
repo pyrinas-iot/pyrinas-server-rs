@@ -10,7 +10,8 @@ use clap::{crate_version, Clap};
 
 // Local lib related
 extern crate pyrinas_server;
-use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, settings, sock};
+use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, sock};
+use pyrinas_shared::settings;
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields

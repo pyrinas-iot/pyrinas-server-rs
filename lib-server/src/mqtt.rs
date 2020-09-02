@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use tokio::task;
 
 // Config related
-use crate::settings::Settings;
+use pyrinas_shared::settings::Settings;
 
 // MQTT related
 use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
