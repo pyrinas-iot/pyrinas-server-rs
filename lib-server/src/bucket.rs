@@ -55,12 +55,12 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   // Wait for event on reciever
   while let Some(event) = reciever.recv().await {
     match event {
-      Event::OtaDeletePackage { uid: _, package } => {
+      Event::OtaDeletePackage(update) => {
         info!("bucket_run: OtaDeletePackage");
 
         // Handle deletion of file from AWS S3
-        if let Err(e) = bucket.delete_object(&package.file).await {
-          warn!("Unable to delete: {}. Error: {}", &package.file, e);
+        if let Err(e) = bucket.delete_object(&update.package.file).await {
+          warn!("Unable to delete: {}. Error: {}", &update.package.file, e);
         }
       }
       _ => {}

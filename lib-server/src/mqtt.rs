@@ -131,14 +131,14 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
             info!("Published..");
           }
         }
-        Event::OtaResponse { uid, package } => {
+        Event::OtaResponse(update) => {
           info!("mqtt_run: Event::OtaResponse");
 
           // Serialize this buddy
-          let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
+          let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
 
           // Generate topic
-          let sub_topic = format!("{}/ota/sub", uid);
+          let sub_topic = format!("{}/ota/sub", update.uid);
 
           // Create a new message
           let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
@@ -229,7 +229,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
 
                     // Send data to broker
                     broker_sender
-                      .send(Event::InfluxDataSave { query: query })
+                      .send(Event::InfluxDataSave(query))
                       .await
                       .unwrap();
                   }

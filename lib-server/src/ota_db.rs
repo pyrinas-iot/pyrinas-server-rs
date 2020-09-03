@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use tokio::time::{delay_for, Duration};
 
 // Local lib related
-use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd};
+use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
 
 // Todo better way of passing error..
 fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
@@ -90,12 +90,13 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
             match package {
               Ok(p) => {
                 info!("Package found!");
+
                 // Send it
                 broker_sender
-                  .send(Event::OtaDeletePackage {
+                  .send(Event::OtaDeletePackage( OtaUpdate{
                     uid: uid.clone(),
                     package: p,
-                  })
+                  }))
                   .await
                   .unwrap();
               }
@@ -119,10 +120,10 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 info!("Package found!");
                 // Send it
                 broker_sender
-                  .send(Event::OtaResponse {
+                  .send(Event::OtaResponse( OtaUpdate{
                     uid: uid.clone(),
                     package: p,
-                  })
+                  }))
                   .await
                   .unwrap();
               }
@@ -134,14 +135,14 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
         }
       }
       // Pprocess OtaNewPackage events
-      Event::OtaNewPackage { uid, package } => {
+      Event::OtaNewPackage(update) => {
         debug!("sled_run: Event::OtaNewPackage");
 
-        if let Ok(entry) = tree.get(&uid) {
+        if let Ok(entry) = tree.get(&update.uid) {
           // Get the u8 data
           let data = entry.as_ref();
           if data.is_some() {
-            error!("Update already exists for {}.", &uid);
+            error!("Update already exists for {}.", &update.uid);
 
             // If there's someting there, no chance to update yet..
             continue;
@@ -149,23 +150,20 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
         }
 
         // Turn entry.package into CBOR
-        let res = serde_cbor::ser::to_vec_packed(&package);
+        let res = serde_cbor::ser::to_vec_packed(&update.package);
 
         // Write into database
         match res {
           Ok(cbor_data) => {
             // Check if insert worked ok
-            if let Err(e) = tree.insert(&uid, cbor_data) {
+            if let Err(e) = tree.insert(&update.uid, cbor_data) {
               error!("Unable to insert into sled. Error: {}", e);
               continue;
             }
 
             // Notify mqtt to send update!
             broker_sender
-              .send(Event::OtaResponse {
-                uid: uid,
-                package: package,
-              })
+              .send(Event::OtaResponse(update))
               .await
               .unwrap();
           }

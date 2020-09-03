@@ -39,14 +39,14 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
   while let Some(event) = reciever.recv().await {
     // Process telemetry and app data
     match event {
-      Event::InfluxDataSave { query } => {
+      Event::InfluxDataSave(query) => {
         debug!("influx_run: InfluxDataSave");
         // Create the query. Shows error if it fails
         if let Err(e) = client.query(&query).await {
           error!("Unable to write query. Error: {}", e);
         }
       }
-      Event::InfluxDataRequest { query: _ } => {
+      Event::InfluxDataRequest(_query) => {
         debug!("influx_run: InfluxDataRequest");
       }
       _ => (),

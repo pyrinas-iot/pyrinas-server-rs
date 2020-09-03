@@ -1,6 +1,5 @@
 // Sytem related
-use log::{debug, info, error};
-use std::str;
+use log::{debug, info, error, warn};
 
 // Config related
 use pyrinas_shared::settings::Settings;
@@ -13,6 +12,9 @@ use tokio::sync::mpsc::{channel, Sender};
 
 // Local lib related
 use pyrinas_shared::Event;
+
+// Cbor
+use serde_cbor;
 
 // Only requires a sender. No response necessary here... yet.
 pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
@@ -58,32 +60,33 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
       continue;
     }
 
-    // Get string from the buffer
-    let s = str::from_utf8(&buffer).unwrap();
-    info!("{}", s);
+    // First deocde into ManagementRequest struct
+    let managment_request: Result<pyrinas_shared::ManagementData, serde_cbor::error::Error> =
+      serde_cbor::from_slice(&buffer);
 
-    // Decode into struct
-    let res: Result<pyrinas_shared::NewOta, serde_json::error::Error> = serde_json::from_str(&s);
+    // Next step in the managment request process
+    match managment_request {
+      Ok(req) =>
+        match req.target.as_str() {
+          "add_ota" => {
 
-    match res {
-      Ok(r) => {
+            // Dedcode ota update
+            let ota_update: Result<pyrinas_shared::OtaUpdate, serde_cbor::error::Error> =
+      serde_cbor::from_slice(&buffer);
 
-      // Send result back to broker
-      let _ = broker_sender
-        .send(Event::OtaNewPackage {
-          uid: r.uid,
-          package: r.package,
-        })
-        .await;
+            // Send if decode was successful
+            match ota_update {
+              Ok(p) => {let _ = broker_sender.send(Event::OtaNewPackage(p)).await;}
+              Err(e) => warn!("Unable to get OtaUpdate. Error: {}",e)
+            }
 
-      }
-      Err(e) => {
-        error!("Unable to decode json from socket. Error: {}",e);
-        continue;
-      }
-
+          }
+          // Otherwise send all others to application
+          _ => {
+            info!("to app");
+          }
+        }
+      Err(e) => error!("Unable to decode ManagementRequest. Error: {}", e)
     }
-
-
   }
 }

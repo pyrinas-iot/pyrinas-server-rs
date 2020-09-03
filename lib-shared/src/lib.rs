@@ -60,7 +60,7 @@ pub struct OTAPackage {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NewOta {
+pub struct OtaUpdate {
     pub uid: String,
     pub package: OTAPackage,
 }
@@ -78,28 +78,25 @@ pub enum OtaRequestCmd {
     Done,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ManagementData {
+    pub target: String,
+    pub msg: Vec<u8>
+}
+
 #[derive(Debug, Clone)]
 pub enum Event {
     NewRunner {
         name: String,
         sender: Sender<Event>,
     },
-    OtaDeletePackage {
-        uid: String,
-        package: OTAPackage,
-    },
-    OtaNewPackage {
-        uid: String,
-        package: OTAPackage,
-    },
+    OtaDeletePackage(OtaUpdate),
+    OtaNewPackage(OtaUpdate),
     OtaRequest {
         uid: String,
         msg: OtaRequest,
     },
-    OtaResponse {
-        uid: String,
-        package: OTAPackage,
-    },
+    OtaResponse(OtaUpdate),
     ApplicationRequest {
         uid: String,
         target: String,
@@ -110,12 +107,10 @@ pub enum Event {
         target: String,
         msg: Vec<u8>,
     }, // Reponse from other parts of the server
-    InfluxDataSave {
-        query: WriteQuery,
-    }, // Takes a pre-prepared query and executes it
-    InfluxDataRequest {
-        query: ReadQuery,
-    }, // Takes a pre-prepared query to *read* the database
+    ApplicationManagementRequest(ManagementData), // Message sent for configuration of application
+    ApplicationManagementResponse(ManagementData), // Reponse from application management portion of the app
+    InfluxDataSave(WriteQuery), // Takes a pre-prepared query and executes it
+    InfluxDataRequest(ReadQuery), // Takes a pre-prepared query to *read* the database
     InfluxDataResponse, // Is the response to InfluxDataRequest
     SledFlush,
 }
