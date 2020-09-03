@@ -15,7 +15,7 @@ use pyrinas_shared::settings::Settings;
 use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
 
 // Local lib related
-use pyrinas_shared::Event;
+use pyrinas_shared::{self,Event};
 
 // Master subscription list
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/+"];
@@ -112,14 +112,14 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
     while let Some(event) = reciever.recv().await {
       // Only process OtaNewPackage eventss
       match event {
-        Event::ApplicationResponse { uid, target, msg } => {
+        Event::ApplicationResponse(data) => {
           info!("mqtt::run Event::ApplicationResponse");
 
           // Generate topic
-          let sub_topic = format!("{}/app/sub/{}", uid, target);
+          let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
 
           // Create a new message
-          let out = Publish::new(&sub_topic, QoS::AtLeastOnce, msg);
+          let out = Publish::new(&sub_topic, QoS::AtLeastOnce, data.msg);
 
           info!("Publishing application message to {}", &sub_topic);
 
@@ -241,11 +241,12 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
 
                 // Send data to broker
                 broker_sender
-                  .send(Event::ApplicationRequest {
-                    uid: uid.to_string(),
-                    target: target.to_string(),
-                    msg: msg.payload.to_vec(),
-                  })
+                  .send(Event::ApplicationRequest(
+                    pyrinas_shared::ApplicationData{
+                      uid: uid.to_string(),
+                      target: target.to_string(),
+                      msg: msg.payload.to_vec(),
+                    }))
                   .await
                   .unwrap();
               }

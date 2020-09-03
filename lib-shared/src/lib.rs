@@ -84,6 +84,13 @@ pub struct ManagementData {
     pub msg: Vec<u8>
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApplicationData {
+    pub uid: String,
+    pub target: String,
+    pub msg: Vec<u8>
+}
+
 #[derive(Debug, Clone)]
 pub enum Event {
     NewRunner {
@@ -97,18 +104,10 @@ pub enum Event {
         msg: OtaRequest,
     },
     OtaResponse(OtaUpdate),
-    ApplicationRequest {
-        uid: String,
-        target: String,
-        msg: Vec<u8>,
-    }, // Request/event from a device
-    ApplicationResponse {
-        uid: String,
-        target: String,
-        msg: Vec<u8>,
-    }, // Reponse from other parts of the server
     ApplicationManagementRequest(ManagementData), // Message sent for configuration of application
     ApplicationManagementResponse(ManagementData), // Reponse from application management portion of the app
+    ApplicationRequest(ApplicationData), // Request/event from a device
+    ApplicationResponse(ApplicationData), // Reponse from other parts of the server
     InfluxDataSave(WriteQuery), // Takes a pre-prepared query and executes it
     InfluxDataRequest(ReadQuery), // Takes a pre-prepared query to *read* the database
     InfluxDataResponse, // Is the response to InfluxDataRequest

@@ -102,11 +102,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
           .await
           .unwrap();
       }
-      Event::ApplicationRequest {
-        uid: _,
-        target: _,
-        msg: _,
-      } => {
+      Event::ApplicationRequest(_data) => {
         debug!("broker_run: ApplicationRequest");
 
         // Send to app handler
@@ -117,7 +113,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
           .await
           .unwrap();
       }
-      Event::ApplicationResponse{ uid: _, target: _, msg: _ } => {
+      Event::ApplicationResponse(_data) => {
         debug!("broker_run: ApplicationResponse");
         // Send to mqtt handler
         runners
