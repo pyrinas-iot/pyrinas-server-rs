@@ -1,5 +1,5 @@
 // Sytem related
-use log::{debug, info, error, warn};
+use log::{debug, error, warn};
 
 // Config related
 use pyrinas_shared::settings::Settings;
@@ -83,7 +83,9 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
           }
           // Otherwise send all others to application
           _ => {
-            info!("to app");
+            if let Err(e) = broker_sender.send(Event::ApplicationManagementRequest(req)).await {
+              warn!("Unable to send ApplicationManagementRequest. Error: {}",e);
+            }
           }
         }
       Err(e) => error!("Unable to decode ManagementRequest. Error: {}", e)
