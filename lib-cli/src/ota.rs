@@ -11,7 +11,7 @@ pub struct OtaInfo {
   pub server_filename: String,
 }
 
-pub fn upload_ota_to_aws(settings: &settings::Settings, file: &str, uid: &str) -> OtaInfo {
+pub fn upload_ota_to_aws(settings: &settings::PyrinasSettings, file: &str, uid: &str) -> OtaInfo {
   // Set up AWS conection
   let credentials = Credentials::new_blocking(
     Some(&settings.s3.access_key),

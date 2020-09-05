@@ -49,7 +49,7 @@ fn main() {
   env_logger::init();
 
   // Parse config file
-  let settings = settings::Settings::new(opts.config.clone()).unwrap_or_else(|e| {
+  let settings = settings::PyrinasSettings::new(opts.config.clone()).unwrap_or_else(|e| {
     error!("Unable to parse config at: {}. Error: {}", &opts.config, e);
     std::process::exit(1);
   });
@@ -81,7 +81,7 @@ fn main() {
       let file_host = format!("https://{}.s3.amazonaws.com/", &settings.s3.bucket);
 
       // Data structure (from pyrinas_shared)
-      let new = pyrinas_shared::NewOta {
+      let new = pyrinas_shared::OtaUpdate {
         uid: s.uid,
         package: pyrinas_shared::OTAPackage {
           version: s.version,

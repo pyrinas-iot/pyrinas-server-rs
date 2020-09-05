@@ -2,9 +2,10 @@
 use log::{debug, error, info, warn};
 
 // Config related
-use pyrinas_shared::settings::Settings;
+use pyrinas_shared::settings::PyrinasSettings;
 
-// Tokio related
+// Tokio + Async related
+use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::time::{delay_for, Duration};
 
@@ -38,7 +39,7 @@ fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (mut sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -93,7 +94,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
 
                 // Send it
                 broker_sender
-                  .send(Event::OtaDeletePackage( OtaUpdate{
+                  .send(Event::OtaDeletePackage(OtaUpdate {
                     uid: uid.clone(),
                     package: p,
                   }))
@@ -120,7 +121,7 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
                 info!("Package found!");
                 // Send it
                 broker_sender
-                  .send(Event::OtaResponse( OtaUpdate{
+                  .send(Event::OtaResponse(OtaUpdate {
                     uid: uid.clone(),
                     package: p,
                   }))

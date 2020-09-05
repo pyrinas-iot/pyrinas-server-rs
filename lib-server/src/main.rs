@@ -1,7 +1,8 @@
 // Sytem related
 use log::info;
 
-// Tokio Related
+// Tokio + async Related
+use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use tokio::task;
 
@@ -30,25 +31,25 @@ async fn main() {
     let opts: Opts = Opts::parse();
 
     // Parse config file
-    let settings = settings::Settings::new(opts.config).unwrap();
+    let settings = Arc::new(settings::PyrinasSettings::new(opts.config).unwrap());
 
     // Channels for communication
     let (broker_sender, broker_reciever) = channel::<pyrinas_shared::Event>(100);
 
     // Init influx connection
-    let influx_task = influx::run(settings.clone(), broker_sender.clone());
+    let influx_task = influx::run(&settings, broker_sender.clone());
 
     // Start sled task
-    let bucket_task = bucket::run(settings.clone(), broker_sender.clone());
+    let bucket_task = bucket::run(&settings, broker_sender.clone());
 
     // Start sled task
-    let ota_db_task = ota_db::run(settings.clone(), broker_sender.clone());
+    let ota_db_task = ota_db::run(&settings, broker_sender.clone());
 
     // Start unix socket task
-    let unix_sock_task = sock::run(settings.clone(), broker_sender.clone());
+    let unix_sock_task = sock::run(&settings, broker_sender.clone());
 
     // Spawn a new task for the MQTT stuff
-    let mqtt_task = mqtt::run(settings.clone(), broker_sender.clone());
+    let mqtt_task = mqtt::run(&settings, broker_sender.clone());
 
     // Spawn the broker task that handles it all!
     let broker_task = task::spawn(broker::run(broker_reciever));

@@ -2,9 +2,10 @@
 use log::{debug, error, warn};
 
 // Config related
-use pyrinas_shared::settings::Settings;
+use pyrinas_shared::settings::PyrinasSettings;
 
 // Tokio Related
+use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
 use tokio::stream::StreamExt;
@@ -17,7 +18,7 @@ use pyrinas_shared::Event;
 use serde_cbor;
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, _) = channel::<pyrinas_shared::Event>(20);
 
@@ -66,29 +67,31 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
 
     // Next step in the managment request process
     match managment_request {
-      Ok(req) =>
-        match req.target.as_str() {
-          "add_ota" => {
+      Ok(req) => match req.target.as_str() {
+        "add_ota" => {
+          // Dedcode ota update
+          let ota_update: Result<pyrinas_shared::OtaUpdate, serde_cbor::error::Error> =
+            serde_cbor::from_slice(&buffer);
 
-            // Dedcode ota update
-            let ota_update: Result<pyrinas_shared::OtaUpdate, serde_cbor::error::Error> =
-      serde_cbor::from_slice(&buffer);
-
-            // Send if decode was successful
-            match ota_update {
-              Ok(p) => {let _ = broker_sender.send(Event::OtaNewPackage(p)).await;}
-              Err(e) => warn!("Unable to get OtaUpdate. Error: {}",e)
+          // Send if decode was successful
+          match ota_update {
+            Ok(p) => {
+              let _ = broker_sender.send(Event::OtaNewPackage(p)).await;
             }
-
-          }
-          // Otherwise send all others to application
-          _ => {
-            if let Err(e) = broker_sender.send(Event::ApplicationManagementRequest(req)).await {
-              warn!("Unable to send ApplicationManagementRequest. Error: {}",e);
-            }
+            Err(e) => warn!("Unable to get OtaUpdate. Error: {}", e),
           }
         }
-      Err(e) => error!("Unable to decode ManagementRequest. Error: {}", e)
+        // Otherwise send all others to application
+        _ => {
+          if let Err(e) = broker_sender
+            .send(Event::ApplicationManagementRequest(req))
+            .await
+          {
+            warn!("Unable to send ApplicationManagementRequest. Error: {}", e);
+          }
+        }
+      },
+      Err(e) => error!("Unable to decode ManagementRequest. Error: {}", e),
     }
   }
 }

@@ -39,7 +39,7 @@ pub struct OtaDb {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Settings {
+pub struct PyrinasSettings {
   pub influx: Influx,
   pub mqtt: Mqtt,
   pub sock: Sock,
@@ -47,7 +47,7 @@ pub struct Settings {
   pub ota_db: OtaDb,
 }
 
-impl Settings {
+impl PyrinasSettings {
   pub fn new(config: String) -> Result<Self, ConfigError> {
     let mut s = Config::new();
 

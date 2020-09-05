@@ -5,22 +5,23 @@ use std::io::Read;
 use std::{env, process};
 
 // Tokio async related
+use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::task;
 
 // Config related
-use pyrinas_shared::settings::Settings;
+use pyrinas_shared::settings::PyrinasSettings;
 
 // MQTT related
 use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
 
 // Local lib related
-use pyrinas_shared::{self,Event};
+use pyrinas_shared::{self, Event};
 
 // Master subscription list
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/+"];
 
-pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
@@ -241,12 +242,11 @@ pub async fn run(settings: Settings, mut broker_sender: Sender<Event>) {
 
                 // Send data to broker
                 broker_sender
-                  .send(Event::ApplicationRequest(
-                    pyrinas_shared::ApplicationData{
-                      uid: uid.to_string(),
-                      target: target.to_string(),
-                      msg: msg.payload.to_vec(),
-                    }))
+                  .send(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
+                    uid: uid.to_string(),
+                    target: target.to_string(),
+                    msg: msg.payload.to_vec(),
+                  }))
                   .await
                   .unwrap();
               }
