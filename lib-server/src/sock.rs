@@ -57,7 +57,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
 
     // If no message, then continue
     if buffer.len() <= 0 {
-      error!("No message received over socket");
+      warn!("No message received over socket");
       continue;
     }
 
