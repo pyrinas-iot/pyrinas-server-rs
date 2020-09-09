@@ -1,5 +1,5 @@
 // Sytem related
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use std::fs::File;
 use std::io::Read;
 use std::{env, process};
@@ -114,7 +114,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
       // Only process OtaNewPackage eventss
       match event {
         Event::ApplicationResponse(data) => {
-          info!("mqtt::run Event::ApplicationResponse");
+          debug!("Event::ApplicationResponse");
 
           // Generate topic
           let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
@@ -122,18 +122,18 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
           // Create a new message
           let out = Publish::new(&sub_topic, QoS::AtLeastOnce, data.msg);
 
-          info!("Publishing application message to {}", &sub_topic);
+          debug!("Publishing application message to {}", &sub_topic);
 
           // Publish to the UID in question
           // TODO: wrap this guy up in a separate spawn so it can get back to work.
           if let Err(e) = tx.send(Request::Publish(out)).await {
             error!("Unable to publish to {}. Error: {}", sub_topic, e);
           } else {
-            info!("Published..");
+            debug!("Published..");
           }
         }
         Event::OtaResponse(update) => {
-          info!("mqtt_run: Event::OtaResponse");
+          debug!("mqtt_run: Event::OtaResponse");
 
           // Serialize this buddy
           let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
@@ -144,14 +144,13 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
           // Create a new message
           let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
 
-          info!("Publishing message to {}", &sub_topic);
+          debug!("Publishing message to {}", &sub_topic);
 
           // Publish to the UID in question
-          // TODO: wrap this guy up in a separate spawn so it can get back to work.
           if let Err(e) = tx.send(Request::Publish(msg)).await {
             error!("Unable to publish to {}. Error: {}", sub_topic, e);
           } else {
-            info!("Published..");
+            debug!("Published..");
           }
         }
         _ => (),
@@ -202,7 +201,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
                 // Match function to handle error
                 match res {
                   Ok(n) => {
-                    info!("{:?}", n);
+                    debug!("{:?}", n);
 
                     // Send message to broker
                     broker_sender
@@ -226,7 +225,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
                 // Match function to handle error
                 match res {
                   Ok(n) => {
-                    info!("{:?}", n);
+                    debug!("{:?}", n);
 
                     // Create query
                     let query = n
