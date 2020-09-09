@@ -19,7 +19,7 @@ use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Sub
 use pyrinas_shared::{self, Event};
 
 // Master subscription list
-const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/+"];
+const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/#"];
 
 pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
@@ -174,11 +174,16 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
             debug!("Publish = {:?}", msg);
 
             // Get the uid and topic
-            let mut topic = msg.topic.split('/');
+            let mut topic = msg.topic.trim().split('/');
             let uid = topic.next().unwrap_or_default();
             let event_type = topic.next().unwrap_or_default();
             let pub_sub = topic.next().unwrap_or_default();
-            let target = topic.next().unwrap_or_default();
+
+            let targets: Vec<&str> = msg.topic.trim().split(pub_sub).collect();
+            let mut target: &str = "";
+            if let Some(t) = targets.last() {
+              target = t.trim_end_matches('/').trim_start_matches('/');
+            }
 
             // Continue if not euql to pub
             if pub_sub != "pub" {
