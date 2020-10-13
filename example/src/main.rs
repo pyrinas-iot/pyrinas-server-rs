@@ -1,3 +1,6 @@
+// App based module
+mod application;
+
 // Sytem related
 use log::info;
 
@@ -10,7 +13,6 @@ use tokio::task;
 use clap::{crate_version, Clap};
 
 // Local lib related
-extern crate pyrinas_server;
 use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, sock};
 use pyrinas_shared::settings;
 
@@ -51,11 +53,15 @@ async fn main() {
     // Spawn a new task for the MQTT stuff
     let mqtt_task = mqtt::run(&settings, broker_sender.clone());
 
+    // Start (very) basic application
+    let app_task = application::run(&settings, broker_sender.clone());
+
     // Spawn the broker task that handles it all!
     let broker_task = task::spawn(broker::run(broker_reciever));
 
     // Join hands kids
     let _join = tokio::join!(
+        app_task,
         ota_db_task,
         influx_task,
         unix_sock_task,
