@@ -1,0 +1,2 @@
+[target.x86_64-unknown-freebsd]
+image = "x86_64-unknown-freebsd:latest"
