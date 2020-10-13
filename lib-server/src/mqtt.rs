@@ -189,6 +189,11 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
 
             // Get the uid and topic
             let mut topic = msg.topic.trim().split('/');
+
+            // Removing the d/ prefix
+            #[cfg(debug_assertions)]
+            topic.next();
+
             let uid = topic.next().unwrap_or_default();
             let event_type = topic.next().unwrap_or_default();
             let pub_sub = topic.next().unwrap_or_default();
