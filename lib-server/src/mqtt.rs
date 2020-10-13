@@ -18,7 +18,12 @@ use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Sub
 // Local lib related
 use pyrinas_shared::{self, Event};
 
-// Master subscription list
+// Master subscription list for debug
+#[cfg(debug_assertions)]
+const SUBSCRIBE: [&str; 3] = ["d/+/ota/pub", "d/+/tel/pub", "d/+/app/pub/#"];
+
+// Master subscription list for release
+#[cfg(not(debug_assertions))]
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/#"];
 
 pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
@@ -82,7 +87,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
 
   // Create the options for the Mqtt client
   let mut opt = MqttOptions::new(
-    "server",
+    settings.mqtt.id.clone(),
     settings.mqtt.host.clone(),
     settings.mqtt.port.parse::<u16>().unwrap(),
   );
@@ -116,7 +121,12 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
         Event::ApplicationResponse(data) => {
           debug!("Event::ApplicationResponse");
 
+          // Generate topic (debug)
+          #[cfg(debug_assertions)]
+          let sub_topic = format!("d/{}/app/sub/{}", data.uid, data.target);
+
           // Generate topic
+          #[cfg(not(debug_assertions))]
           let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
 
           // Create a new message
@@ -138,7 +148,12 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
           // Serialize this buddy
           let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
 
+          // Generate topic (debug)
+          #[cfg(debug_assertions)]
+          let sub_topic = format!("d/{}/ota/sub", update.uid);
+
           // Generate topic
+          #[cfg(not(debug_assertions))]
           let sub_topic = format!("{}/ota/sub", update.uid);
 
           // Create a new message

@@ -4,12 +4,10 @@ edition = "2018"
 name = "pyrinas-cli"
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-aws-creds = "^0.22.2" 
-aws-region = "^0.21.0" 
-chrono = "^0.4.0" 
+aws-creds = "^0.22.2" # AWS related
+aws-region = "^0.21.0" # AWS related
+chrono = "^0.4.0" # Tracking time
 clap = "~3.0.0-beta.1" # CLI Library (Needed?)
 dotenv = "^0.9.0" # .env file parsing
 env_logger = "^0.7" # logging message control using env variable
@@ -17,4 +15,4 @@ log = "^0.4.11" # logging messages
 pyrinas-shared = {path = "../lib-shared/"} 
 rust-s3 = "^0.22.12" # Handling upload of files
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
-serde_json = "^1.0"
+serde_json = "^1.0" # For serialization of json

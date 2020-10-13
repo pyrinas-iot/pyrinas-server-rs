@@ -4,6 +4,7 @@ use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Mqtt {
+  pub id: String,
   pub host: String,
   pub port: String,
   pub ca_cert: String,

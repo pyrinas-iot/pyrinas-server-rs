@@ -6,6 +6,7 @@ port = "8086"
 user = "<USER>"
 
 [mqtt]
+id = "<YOUR SERVER NAME>
 ca_cert = "ca.crt"
 host = "<IP>"
 port = "1883"
