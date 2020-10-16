@@ -71,7 +71,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
         "add_ota" => {
           // Dedcode ota update
           let ota_update: Result<pyrinas_shared::OtaUpdate, serde_cbor::error::Error> =
-            serde_cbor::from_slice(&buffer);
+            serde_cbor::from_slice(&req.msg);
 
           // Send if decode was successful
           match ota_update {
