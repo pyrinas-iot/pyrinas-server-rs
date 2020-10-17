@@ -1,5 +1,5 @@
 // System Related
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 
 // Config related
 use pyrinas_shared::settings::PyrinasSettings;
@@ -87,24 +87,16 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
             info!("Done!");
 
             // Send the DeletePackage command (for S3 Bucket)
-            let package = get_ota_package(&tree, &uid);
-            match package {
-              Ok(p) => {
-                info!("Package found!");
+            let package = get_ota_package(&tree, &uid).ok();
 
-                // Send it
-                broker_sender
-                  .send(Event::OtaDeletePackage(OtaUpdate {
-                    uid: uid.clone(),
-                    package: p,
-                  }))
-                  .await
-                  .unwrap();
-              }
-              Err(e) => {
-                warn!("Unable to get package. Err: {}", e);
-              }
-            }
+            // Send it
+            broker_sender
+              .send(Event::OtaDeletePackage(OtaUpdate {
+                uid: uid.clone(),
+                package: package,
+              }))
+              .await
+              .unwrap();
 
             // Delete entry from dB
             if let Err(e) = tree.remove(&uid) {
@@ -115,23 +107,16 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
             debug!("Check!");
 
             // Check if there's a package available and ready
-            let package = get_ota_package(&tree, &uid);
-            match package {
-              Ok(p) => {
-                info!("Package found!");
-                // Send it
-                broker_sender
-                  .send(Event::OtaResponse(OtaUpdate {
-                    uid: uid.clone(),
-                    package: p,
-                  }))
-                  .await
-                  .unwrap();
-              }
-              Err(e) => {
-                warn!("Unable to get package. Err: {}", e);
-              }
-            }
+            let package = get_ota_package(&tree, &uid).ok();
+
+            // Send it
+            broker_sender
+              .send(Event::OtaResponse(OtaUpdate {
+                uid: uid.clone(),
+                package: package,
+              }))
+              .await
+              .unwrap();
           }
         }
       }

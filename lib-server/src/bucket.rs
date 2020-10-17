@@ -59,9 +59,11 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
       Event::OtaDeletePackage(update) => {
         info!("bucket_run: OtaDeletePackage");
 
-        // Handle deletion of file from AWS S3
-        if let Err(e) = bucket.delete_object(&update.package.file).await {
-          warn!("Unable to delete: {}. Error: {}", &update.package.file, e);
+        if let Some(package) = update.package {
+          // Handle deletion of file from AWS S3
+          if let Err(e) = bucket.delete_object(&package.file).await {
+            warn!("Unable to delete: {}. Error: {}", &package.file, e);
+          }
         }
       }
       _ => {}
