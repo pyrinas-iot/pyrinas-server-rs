@@ -84,7 +84,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
         // Do something different depending on the situation
         match msg.cmd {
           OtaRequestCmd::Done => {
-            info!("Done!");
+            debug!("Done!");
 
             // Send the DeletePackage command (for S3 Bucket)
             let package = get_ota_package(&tree, &uid).ok();
