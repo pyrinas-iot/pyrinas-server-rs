@@ -1,5 +1,5 @@
 // System Related
-use log::{debug, error, info};
+use log::{debug, error};
 
 // Config related
 use pyrinas_shared::settings::PyrinasSettings;
