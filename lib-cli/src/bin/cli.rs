@@ -83,12 +83,12 @@ fn main() {
       // Data structure (from pyrinas_shared)
       let new = pyrinas_shared::OtaUpdate {
         uid: s.uid,
-        package: pyrinas_shared::OTAPackage {
+        package: Some(pyrinas_shared::OTAPackage {
           version: s.version,
           host: file_host,
           file: ota_info.server_filename,
           force: s.force,
-        },
+        }),
       };
 
       // serialize to json
