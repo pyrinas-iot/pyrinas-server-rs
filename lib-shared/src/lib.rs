@@ -11,7 +11,7 @@ use tokio::sync::mpsc::Sender;
 // Note: the enum indexes match the entry order below. i.e. the order counts!
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelemetryData {
-    version: String,
+    version: Option<String>,
     rsrp: Option<u32>,        // Won't always have rsrp (hub only)
     rssi_hub: Option<i32>,    // Won't always have this guy either
     rssi_client: Option<i32>, // Won't always have this guy either
@@ -19,7 +19,7 @@ pub struct TelemetryData {
 
 #[derive(Debug, InfluxDbWriteable, Clone)]
 pub struct InfluxTelemetryData {
-    version: String,
+    version: Option<String>,  // Wont always have this guy either.
     rsrp: Option<u32>,        // Won't always have rsrp (hub only)
     rssi_hub: Option<i32>,    // Won't always have this guy either
     rssi_client: Option<i32>, // Won't always have this guy either
