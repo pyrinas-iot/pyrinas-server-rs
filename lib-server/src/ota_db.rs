@@ -1,5 +1,5 @@
 // System Related
-use log::{debug, error};
+use log::{debug, error, warn};
 
 // Config related
 use pyrinas_shared::settings::PyrinasSettings;
@@ -128,10 +128,12 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
           // Get the u8 data
           let data = entry.as_ref();
           if data.is_some() {
-            error!("Update already exists for {}.", &update.uid);
+            warn!("Update already exists for {}.", &update.uid);
 
-            // If there's someting there, no chance to update yet..
-            continue;
+            // Remove
+            if let Err(e) = tree.remove(&update.uid) {
+              warn!("Unable to delete OTA entry. Error: {}", e);
+            }
           }
         }
 

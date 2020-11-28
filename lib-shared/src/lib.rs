@@ -52,8 +52,18 @@ impl InfluxTelemetryData {
 
 // Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OTAPackageVersion {
+    pub major: u8,
+    pub minor: u8,
+    pub patch: u8,
+    pub commit: u8,
+    pub hash: [u8; 8],
+}
+
+// Struct that gets serialized for OTA support
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OTAPackage {
-    pub version: String,
+    pub version: OTAPackageVersion,
     pub host: String,
     pub file: String,
     pub force: bool,

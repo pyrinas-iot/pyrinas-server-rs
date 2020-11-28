@@ -12,7 +12,8 @@ clap = "~3.0.0-beta.1" # CLI Library (Needed?)
 dotenv = "^0.9.0" # .env file parsing
 env_logger = "^0.7" # logging message control using env variable
 log = "^0.4.11" # logging messages
-pyrinas-shared = {path = "../lib-shared/"} 
+pyrinas-shared = { path = "../lib-shared/" } 
 rust-s3 = "^0.22.12" # Handling upload of files
-serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing 
+serde = { version = "^1.0", features = ["derive"] }# Serializing/deserializing  
 serde_json = "^1.0" # For serialization of json
+serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
