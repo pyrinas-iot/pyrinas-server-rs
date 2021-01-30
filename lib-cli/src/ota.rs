@@ -1,9 +1,8 @@
 use crate::OTAManifest;
-use awscreds::Credentials;
 use chrono::Utc;
 use log::error;
 use pyrinas_shared::settings;
-use s3::bucket::Bucket;
+use s3::{bucket::Bucket,creds::Credentials};
 use serde_cbor;
 use std::fs::File;
 use std::io::prelude::*;
@@ -83,7 +82,7 @@ pub fn add_ota_from_manifest(
 
 pub fn upload_ota_to_aws(settings: &settings::PyrinasSettings, file: &str, uid: &str) -> OtaInfo {
   // Set up AWS conection
-  let credentials = Credentials::new_blocking(
+  let credentials = Credentials::new(
     Some(&settings.s3.access_key),
     Some(&settings.s3.secret_key),
     None,
@@ -130,7 +129,7 @@ pub fn upload_ota_to_aws(settings: &settings::PyrinasSettings, file: &str, uid: 
 
   // Upload file to AWS
   let (_, status_code) = bucket
-    .put_object_blocking(&server_filename, &buffer, "application/octet-stream")
+    .put_object_blocking(&server_filename, &buffer)
     .unwrap_or_else(|e| {
       error!("Unable to upload {}! Error: {}", &server_filename, e);
       std::process::exit(1);

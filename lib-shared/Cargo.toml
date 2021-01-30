@@ -7,8 +7,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytes = "0.5.6"
-chrono = "0.4.13"
+chrono = "0.4"
 config = {git = "https://github.com/mehcode/config-rs", rev = "2c0b2010"}# Used for reading configuration file
 influxdb = {git = "https://github.com/Empty2k12/influxdb-rust", rev = "056681190af7535daccbf24fe04b06f770733f5a", features = ["derive"]}# InfluxDB access
 serde = {version = "^1.0", features = ["derive"]}# Serializing/deserializing

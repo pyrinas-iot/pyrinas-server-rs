@@ -2,8 +2,7 @@
 use log::{error, info, warn};
 
 // S3 Bucket related
-use awscreds::Credentials;
-use s3::bucket::Bucket as aws;
+use s3::{bucket::Bucket,creds::Credentials};
 
 // Config related
 use pyrinas_shared::settings::PyrinasSettings;
@@ -24,7 +23,6 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
     None,
     None,
   )
-  .await
   .unwrap_or_else(|e| {
     error!("Unable to create AWS credentials! {}", e);
     std::process::exit(1);
@@ -51,7 +49,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
 
   // Create bucket
   let bucket =
-    aws::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
+    Bucket::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
 
   // Wait for event on reciever
   while let Some(event) = reciever.recv().await {
