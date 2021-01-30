@@ -1,8 +1,13 @@
+# Rust/Cargo related
 /target
 Cargo.lock
+
+# Repo related
+_certs
+
+# Files to ignore
 config.toml
 *.sock
-.env
 *.crt
 *.key
 *.db
