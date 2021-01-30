@@ -1,7 +1,7 @@
 pub mod settings;
 
 use chrono::{DateTime, Utc};
-use influxdb::{InfluxDbWriteable, ReadQuery, Timestamp, WriteQuery};
+use influxdb::{InfluxDbWriteable, ReadQuery, WriteQuery};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use tokio::sync::mpsc::Sender;
@@ -25,7 +25,7 @@ pub struct InfluxTelemetryData {
     rssi_client: Option<i32>, // Won't always have this guy either
     #[tag]
     id: String,    // Typically not sent as it's included in the MQTT topic
-    time: DateTime<Utc>,      // Only used for insertting data into Influx DB
+    time: DateTime<Utc>,      // Only used for inserting data into Influx DB
 }
 
 impl TelemetryData {
@@ -37,7 +37,7 @@ impl TelemetryData {
             rssi_hub: self.rssi_hub,
             rssi_client: self.rssi_client,
             id: uid,
-            time: Timestamp::Now.into(),
+            time: Utc::now(),
         }
     }
 }
