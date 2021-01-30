@@ -13,7 +13,7 @@ use tokio::task;
 use pyrinas_shared::settings::PyrinasSettings;
 
 // MQTT related
-use rumqttc::{self, EventLoop, Incoming, MqttOptions, Publish, QoS, Request, Subscribe};
+use rumqttc::{self, EventLoop, Packet, Event::{Incoming, Outgoing}, MqttOptions, Publish, QoS, Request, Subscribe};
 
 // Local lib related
 use pyrinas_shared::{self, Event};
@@ -96,7 +96,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
   // opt.set_ca(ca_cert_buf);
   // opt.set_client_auth(server_cert_buf, private_key_buf);
 
-  let mut eventloop = EventLoop::new(opt, 10).await;
+  let mut eventloop = EventLoop::new(opt, 10);
   let tx = eventloop.handle();
 
   // Loop for sending messages from main broker
@@ -175,111 +175,111 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
 
   // Loop for recieving messages
   loop {
-    if let Ok((incoming, _)) = eventloop.poll().await {
+    if let Ok(incoming) = eventloop.poll().await {
       // If we have an actual message
-      if incoming.is_some() {
-        // Get the message
-        let msg = incoming.unwrap();
+      let msg =  match incoming {
+        Incoming(i) => i,
+        Outgoing(_) => continue,
+      };
 
-        // Sort it
-        match msg {
-          // Incoming::Publish is the main thing we're concerned with here..
-          Incoming::Publish(msg) => {
-            debug!("Publish = {:?}", msg);
+      // Sort it
+      match msg {
+        // Incoming::Publish is the main thing we're concerned with here..
+        Packet::Publish(msg) => {
+          debug!("Publish = {:?}", msg);
 
-            // Get the uid and topic
-            let mut topic = msg.topic.trim().split('/');
+          // Get the uid and topic
+          let mut topic = msg.topic.trim().split('/');
 
-            // Removing the d/ prefix
-            #[cfg(debug_assertions)]
-            topic.next();
+          // Removing the d/ prefix
+          #[cfg(debug_assertions)]
+          topic.next();
 
-            let uid = topic.next().unwrap_or_default();
-            let event_type = topic.next().unwrap_or_default();
-            let pub_sub = topic.next().unwrap_or_default();
+          let uid = topic.next().unwrap_or_default();
+          let event_type = topic.next().unwrap_or_default();
+          let pub_sub = topic.next().unwrap_or_default();
 
-            let targets: Vec<&str> = msg.topic.trim().split(pub_sub).collect();
-            let mut target: &str = "";
-            if let Some(t) = targets.last() {
-              target = t.trim_end_matches('/').trim_start_matches('/');
-            }
-
-            // Continue if not euql to pub
-            if pub_sub != "pub" {
-              warn!("Pubsub not 'pub'. Value: {}", pub_sub);
-              continue;
-            }
-
-            match event_type {
-              "ota" => {
-                // Get the telemetry data
-                let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error>;
-
-                // Get the result
-                res = serde_cbor::from_slice(msg.payload.as_ref());
-
-                // Match function to handle error
-                match res {
-                  Ok(n) => {
-                    debug!("{:?}", n);
-
-                    // Send message to broker
-                    broker_sender
-                      .send(Event::OtaRequest {
-                        uid: uid.to_string(),
-                        msg: n,
-                      })
-                      .await
-                      .unwrap();
-                  }
-                  Err(e) => error!("OTA decode error: {}", e),
-                }
-              }
-              "tel" => {
-                // Get the telemetry data
-                let res: Result<pyrinas_shared::TelemetryData, serde_cbor::error::Error>;
-
-                // Get the result
-                res = serde_cbor::from_slice(msg.payload.as_ref());
-
-                // Match function to handle error
-                match res {
-                  Ok(n) => {
-                    debug!("{:?}", n);
-
-                    // Create query
-                    let query = n
-                      .to_influx_data(uid.to_string())
-                      .to_influx_query("telemetry".to_string());
-
-                    // Send data to broker
-                    broker_sender
-                      .send(Event::InfluxDataSave(query))
-                      .await
-                      .unwrap();
-                  }
-                  Err(e) => error!("Telemetry decode error: {}", e),
-                }
-              }
-              "app" => {
-                debug!("app: from:{:?}", uid.to_string());
-
-                // Send data to broker
-                broker_sender
-                  .send(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
-                    uid: uid.to_string(),
-                    target: target.to_string(),
-                    msg: msg.payload.to_vec(),
-                  }))
-                  .await
-                  .unwrap();
-              }
-              _ => {}
-            }
+          let targets: Vec<&str> = msg.topic.trim().split(pub_sub).collect();
+          let mut target: &str = "";
+          if let Some(t) = targets.last() {
+            target = t.trim_end_matches('/').trim_start_matches('/');
           }
-          _ => {}
-        };
-      }
+
+          // Continue if not euql to pub
+          if pub_sub != "pub" {
+            warn!("Pubsub not 'pub'. Value: {}", pub_sub);
+            continue;
+          }
+
+          match event_type {
+            "ota" => {
+              // Get the telemetry data
+              let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error>;
+
+              // Get the result
+              res = serde_cbor::from_slice(msg.payload.as_ref());
+
+              // Match function to handle error
+              match res {
+                Ok(n) => {
+                  debug!("{:?}", n);
+
+                  // Send message to broker
+                  broker_sender
+                    .send(Event::OtaRequest {
+                      uid: uid.to_string(),
+                      msg: n,
+                    })
+                    .await
+                    .unwrap();
+                }
+                Err(e) => error!("OTA decode error: {}", e),
+              }
+            }
+            "tel" => {
+              // Get the telemetry data
+              let res: Result<pyrinas_shared::TelemetryData, serde_cbor::error::Error>;
+
+              // Get the result
+              res = serde_cbor::from_slice(msg.payload.as_ref());
+
+              // Match function to handle error
+              match res {
+                Ok(n) => {
+                  debug!("{:?}", n);
+
+                  // Create query
+                  let query = n
+                    .to_influx_data(uid.to_string())
+                    .to_influx_query("telemetry".to_string());
+
+                  // Send data to broker
+                  broker_sender
+                    .send(Event::InfluxDataSave(query))
+                    .await
+                    .unwrap();
+                }
+                Err(e) => error!("Telemetry decode error: {}", e),
+              }
+            }
+            "app" => {
+              debug!("app: from:{:?}", uid.to_string());
+
+              // Send data to broker
+              broker_sender
+                .send(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
+                  uid: uid.to_string(),
+                  target: target.to_string(),
+                  msg: msg.payload.to_vec(),
+                }))
+                .await
+                .unwrap();
+            }
+            _ => {}
+          }
+        }
+        _ => {}
+      };
     };
   }
 }
