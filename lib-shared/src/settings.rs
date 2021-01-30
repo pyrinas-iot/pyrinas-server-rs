@@ -1,12 +1,14 @@
-use config::{Config, ConfigError, File};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use std::fs;
 use std::path::Path;
+use toml;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Mqtt {
   pub id: String,
   pub host: String,
-  pub port: String,
+  pub port: u16,
   pub ca_cert: String,
   pub server_cert: String,
   pub private_key: String,
@@ -17,7 +19,7 @@ pub struct Influx {
   pub database: String,
   pub host: String,
   pub password: String,
-  pub port: String,
+  pub port: u16,
   pub user: String,
 }
 
@@ -49,16 +51,17 @@ pub struct PyrinasSettings {
 }
 
 impl PyrinasSettings {
-  pub fn new(config: String) -> Result<Self, ConfigError> {
-    let mut s = Config::new();
+    pub fn new(config: String) -> Result<Self> {
+        // Get the path
+        let path = Path::new(&config);
 
-    // Get the path
-    let path = Path::new(&config);
+        // Get it as a string first
+        let config = fs::read_to_string(path)?;
 
-    // Get the configuration file
-    s.merge(File::from(path))?;
-
-    // You can deserialize (and thus freeze) the entire configuration as
-    s.try_into()
-  }
+        // Get the actual config
+        match toml::from_str(&config) {
+            Ok(settings) => Ok(settings),
+            Err(e) => Err(anyhow!("Unable to deserialize TOML: {}", e)),
+        }
+    }
 }

@@ -89,7 +89,7 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
   let mut opt = MqttOptions::new(
     settings.mqtt.id.clone(),
     settings.mqtt.host.clone(),
-    settings.mqtt.port.parse::<u16>().unwrap(),
+    settings.mqtt.port.clone(),
   );
   opt.set_keep_alive(120);
   // TODO: add these back when things are working again...
