@@ -8,7 +8,6 @@ version = "0.1.0"
 
 [dependencies]
 chrono = "0.4"
-config = {git = "https://github.com/mehcode/config-rs", rev = "2c0b2010"}# Used for reading configuration file
 influxdb = {version = "0.3", features = ["derive"]}# InfluxDB access
 serde = {version = "1.0", features = ["derive"]}# Serializing/deserializing
 serde_repr = "0.1"
