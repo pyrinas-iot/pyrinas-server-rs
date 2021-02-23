@@ -10,13 +10,13 @@ version = "0.1.0"
 async-channel = "1.5.1" # Used with rumqttc
 clap = "3.0.0-beta.2" # CLI Library
 env_logger = "0.8" # logging message control using env variable
-influxdb = { version = "0.3", features = ["derive"]}# InfluxDB access 
+influxdb = { version = "0.3", features = ["derive"] }# InfluxDB access 
 log = "0.4" # logging messages
-pyrinas-shared = {path = "../lib-shared/"}# Local shared for settings, etc 
-rumqttc = "0.2"# Mqtt core bits 
+pyrinas-shared = { path = "../lib-shared/" }# Local shared for settings, etc 
+rumqttc = "0.2" # Mqtt core bits 
 rust-s3 = "0.26" # Handling upload of files
-serde = {version = "1.0", features = ["derive"]}# Serializing/deserializing 
+serde = { version = "1.0", features = ["derive"] }# Serializing/deserializing 
 serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
 serde_json = "1.0" # Serializing/deserializing json
 sled = "0.34" # Storing events as KV store
-tokio = {version = "0.2", features = ["uds", "io-util"]}
+tokio = { version = "0.2", features = ["uds", "io-util"] }

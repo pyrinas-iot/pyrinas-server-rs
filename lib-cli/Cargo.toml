@@ -9,7 +9,7 @@ chrono = "0.4" # Tracking time
 clap = "3.0.0-beta.2" # CLI Library (Needed?)
 env_logger = "0.8" # logging message control using env variable
 log = "0.4" # logging messages
-pyrinas-shared = { path = "../lib-shared/" } 
+pyrinas-shared = { path = "../lib-shared/" }
 rust-s3 = "0.26" # Handling upload of files
 serde = { version = "^1.0", features = ["derive"] }# Serializing/deserializing  
 serde_json = "^1.0" # For serialization of json
