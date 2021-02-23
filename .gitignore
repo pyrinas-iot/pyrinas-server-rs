@@ -13,3 +13,4 @@ config.toml
 .vagrant
 
 *.db
+*.bin
