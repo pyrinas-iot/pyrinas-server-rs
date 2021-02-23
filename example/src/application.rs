@@ -1,5 +1,5 @@
 // Config related
-use pyrinas_shared::{self, settings::PyrinasSettings, Event};
+use pyrinas_server::{settings::PyrinasSettings, Event};
 
 // Log
 use log::info;

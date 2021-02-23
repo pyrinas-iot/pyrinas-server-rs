@@ -6,10 +6,4 @@ pub mod mqtt;
 pub mod ota_db;
 pub mod sock;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use pyrinas_shared::*;

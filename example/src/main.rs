@@ -13,9 +13,7 @@ use tokio::task;
 use clap::{crate_version, Clap};
 
 // Local lib related
-use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, sock};
-use pyrinas_shared::settings;
-
+use pyrinas_server::{broker, bucket, influx, mqtt, ota_db, settings, sock};
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
 #[derive(Clap)]
@@ -36,7 +34,7 @@ async fn main() {
     let settings = Arc::new(settings::PyrinasSettings::new(opts.config).unwrap());
 
     // Channels for communication
-    let (broker_sender, broker_reciever) = channel::<pyrinas_shared::Event>(100);
+    let (broker_sender, broker_reciever) = channel::<pyrinas_server::Event>(100);
 
     // Init influx connection
     let influx_task = influx::run(&settings, broker_sender.clone());
