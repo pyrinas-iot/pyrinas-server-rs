@@ -71,3 +71,8 @@ manifest generated!
 }
 File written to ./manifest.json
 ```
+
+## License
+
+This repository has an Apache 2.0 license. Contributions will be licensed the same
+with no additional terms or conditions. See `LICEENSE` file for more information.
