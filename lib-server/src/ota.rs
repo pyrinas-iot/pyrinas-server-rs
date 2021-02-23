@@ -1,6 +1,3 @@
-// System Related
-use log::{debug, error, warn};
-
 // async Related
 use flume::{unbounded, Sender};
 use std::sync::Arc;
@@ -9,7 +6,7 @@ use std::sync::Arc;
 use pyrinas_shared::settings::PyrinasSettings;
 use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
 
-// Todo better way of passing error..
+// TODO: better way of passing error..
 fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
     // Check if there's a package available and ready
     let entry = db.get(&uid);
@@ -57,12 +54,12 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
         match event {
             // Process OtaRequests
             Event::OtaRequest { uid, msg } => {
-                debug!("sled_run: Event::OtaRequest");
+                log::debug!("sled_run: Event::OtaRequest");
 
                 // Do something different depending on the situation
                 match msg.cmd {
                     OtaRequestCmd::Done => {
-                        debug!("Done!");
+                        log::debug!("Done!");
 
                         // Send the DeletePackage command (for S3 Bucket)
                         let package = get_ota_package(&tree, &uid).ok();
@@ -78,11 +75,15 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
 
                         // Delete entry from dB
                         if let Err(e) = tree.remove(&uid) {
-                            error!("Unable to remove {} from OTA database. Error: {}", &uid, e);
+                            log::error!(
+                                "Unable to remove {} from OTA database. Error: {}",
+                                &uid,
+                                e
+                            );
                         }
                     }
                     OtaRequestCmd::Check => {
-                        debug!("Check!");
+                        log::debug!("Check!");
 
                         // Check if there's a package available and ready
                         let package = get_ota_package(&tree, &uid).ok();
@@ -100,23 +101,23 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
             }
             // Pprocess OtaNewPackage events
             Event::OtaNewPackage(update) => {
-                debug!("sled_run: Event::OtaNewPackage");
+                log::debug!("sled_run: Event::OtaNewPackage");
 
                 if let Ok(entry) = tree.get(&update.uid) {
                     // Get the u8 data
                     let data = entry.as_ref();
                     if data.is_some() {
-                        warn!("Update already exists for {}.", &update.uid);
+                        log::warn!("Update already exists for {}.", &update.uid);
 
                         // Remove
                         if let Err(e) = tree.remove(&update.uid) {
-                            warn!("Unable to delete OTA entry. Error: {}", e);
+                            log::warn!("Unable to delete OTA entry. Error: {}", e);
                             continue;
                         }
 
                         // Save it to disk
                         if let Err(e) = tree.flush_async().await {
-                            error!("Unable to flush tree. Error: {}", e);
+                            log::error!("Unable to flush tree. Error: {}", e);
                         }
                     }
                 }
@@ -129,13 +130,13 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
                     Ok(cbor_data) => {
                         // Check if insert worked ok
                         if let Err(e) = tree.insert(&update.uid, cbor_data) {
-                            error!("Unable to insert into sled. Error: {}", e);
+                            log::error!("Unable to insert into sled. Error: {}", e);
                             continue;
                         }
 
                         // Save it to disk
                         if let Err(e) = tree.flush_async().await {
-                            error!("Unable to flush tree. Error: {}", e);
+                            log::error!("Unable to flush tree. Error: {}", e);
                         }
 
                         // Notify mqtt to send update!
@@ -145,7 +146,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
                             .unwrap();
                     }
                     Err(e) => {
-                        error!("Unable to serialize. Error: {}", e);
+                        log::error!("Unable to serialize. Error: {}", e);
                     }
                 }
             }

@@ -5,6 +5,9 @@ use std::collections::hash_map::{Entry, HashMap};
 // Channels
 use flume::{Receiver, Sender};
 
+// Error
+use anyhow::{anyhow, Result};
+
 // Local lib related
 use pyrinas_shared::Event;
 
@@ -30,100 +33,88 @@ pub async fn run(broker_reciever: Receiver<Event>) {
             Event::OtaNewPackage(_update) => {
                 debug!("broker_run: Event::OtaNewPackage");
 
-                // Send to sled
-                runners
-                    .get_mut("sled")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                // Send to ota task
+                if let Err(e) = send("ota", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::OtaResponse(_update) => {
                 // Send to mqtt
-                runners
-                    .get_mut("mqtt")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("mqtt", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::OtaRequest { uid: _, msg: _ } => {
                 debug!("broker_run: OtaRequest");
 
                 // Send to sled
-                runners
-                    .get_mut("sled")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("ota", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::InfluxDataSave(_query) => {
                 debug!("broker_run: InfluxDataSave");
 
                 // Send to influx
-                runners
-                    .get_mut("influx")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("influx", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::OtaDeletePackage(_update) => {
                 debug!("broker_run: OtaDeletePackage");
 
                 // Send to bucket handler
-                runners
-                    .get_mut("bucket")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("ota", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::ApplicationManagementRequest(_data) => {
                 debug!("broker_run: ApplicationManagementRequest");
 
                 // Send to app handler
-                runners
-                    .get_mut("app")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("app", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::ApplicationManagementResponse(_data) => {
                 debug!("broker_run: ApplicationManagementResponse");
 
                 // Send to app handler
-                runners
-                    .get_mut("sock")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("sock", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::ApplicationRequest(_data) => {
                 debug!("broker_run: ApplicationRequest");
 
                 // Send to app handler
-                runners
-                    .get_mut("app")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("app", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             Event::ApplicationResponse(_data) => {
                 debug!("broker_run: ApplicationResponse");
                 // Send to mqtt handler
-                runners
-                    .get_mut("mqtt")
-                    .unwrap()
-                    .send_async(event.clone())
-                    .await
-                    .unwrap();
+                if let Err(e) = send("mqtt", &event, &mut runners).await {
+                    log::error!("{}", e);
+                }
             }
             _ => (),
         }
+    }
+}
+
+/// Local only function to search for and find the corresponding sender
+async fn send(
+    task_name: &str,
+    event: &Event,
+    runners: &mut HashMap<String, Sender<Event>>,
+) -> Result<()> {
+    match runners.get_mut(task_name) {
+        Some(sender) => {
+            sender.send_async(event.clone()).await?;
+            Ok(())
+        }
+        None => Err(anyhow!("{} broker task not registered!", task_name)),
     }
 }

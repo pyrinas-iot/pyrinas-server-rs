@@ -7,8 +7,8 @@ license = "Apache-2.0"
 
 [features]
 default = ["runtime_tokio"]
-runtime_tokio = ["tokio"]
-runtime_async_std = ["async-std","async-macros"]
+runtime_tokio = ["tokio", "tokio-stream"]
+runtime_async_std = ["async-std", "async-macros"]
 
 [dependencies]
 async-channel = "1.5.1" # Used with rumqttc
@@ -24,9 +24,11 @@ serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
 serde_json = "1.0" # Serializing/deserializing json
 sled = "0.34" # Storing events as KV store
 flume = "0.10.2" # Channels
+cfg-if = "1.0.0" # Macro config
+anyhow = "1.0" # Generic error
 
 # Optional features
-tokio = { version = "0.2", default-features = false, features = ["uds", "io-util"], optional = true }
+tokio = { version = "1.0", default-features = false, features = ["net", "rt", "macros", "io-util"], optional = true }
 async-std = { version = "1.9.0", optional = true, default-features = false }
 async-macros = { version = "2.0.0", optional = true }
-
+tokio-stream = { version = "*", features = ["net"], optional = true }

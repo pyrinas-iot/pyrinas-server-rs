@@ -3,7 +3,7 @@ pub mod broker;
 pub mod bucket;
 pub mod influx;
 pub mod mqtt;
-pub mod ota_db;
+pub mod ota;
 pub mod sock;
 
 pub use pyrinas_shared::*;
@@ -48,7 +48,7 @@ pub async fn run(
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
     let ota_db_task = task::spawn(async move {
-        ota_db::run(task_settings, task_sender).await;
+        ota::run(task_settings, task_sender).await;
     });
 
     // Clone these appropriately
