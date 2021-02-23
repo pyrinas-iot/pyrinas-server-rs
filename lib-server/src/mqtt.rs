@@ -7,12 +7,12 @@ use std::{env, process};
 // Tokio async related
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
-use tokio::task;
 
 // Config related
 use pyrinas_shared::settings::PyrinasSettings;
 
 // MQTT related
+use async_channel;
 use rumqttc::{
     self,
     Event::{Incoming, Outgoing},
@@ -30,19 +30,7 @@ const SUBSCRIBE: [&str; 3] = ["d/+/ota/pub", "d/+/tel/pub", "d/+/app/pub/#"];
 #[cfg(not(debug_assertions))]
 const SUBSCRIBE: [&str; 3] = ["+/ota/pub", "+/tel/pub", "+/app/pub/#"];
 
-pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
-    // Get the sender/reciever associated with this particular task
-    let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
-
-    // Register this task
-    broker_sender
-        .send(Event::NewRunner {
-            name: "mqtt".to_string(),
-            sender: sender.clone(),
-        })
-        .await
-        .unwrap();
-
+pub async fn setup(settings: Arc<PyrinasSettings>) -> EventLoop {
     // We assume that we are in a valid directory.
     let mut ca_cert = env::current_dir().unwrap();
     ca_cert.push(settings.mqtt.ca_cert.clone());
@@ -97,83 +85,10 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
     // opt.set_ca(ca_cert_buf);
     // opt.set_client_auth(server_cert_buf, private_key_buf);
 
-    let mut eventloop = EventLoop::new(opt, 10);
-    let tx = eventloop.handle();
+    EventLoop::new(opt, 10)
+}
 
-    // Loop for sending messages from main broker
-    let _ = task::spawn(async move {
-        // TODO: handle cases were the sesion is not maintained..
-
-        // Iterate though all potential subscriptions
-        for item in SUBSCRIBE.iter() {
-            // Set up subscription
-            let subscription = Subscribe::new(*item, QoS::AtMostOnce);
-            tx.send(Request::Subscribe(subscription))
-                .await
-                .unwrap_or_else(|e| {
-                    println!("Unable to subscribe! Error: {}", e);
-                    process::exit(1);
-                });
-        }
-
-        while let Some(event) = reciever.recv().await {
-            // Only process OtaNewPackage eventss
-            match event {
-                Event::ApplicationResponse(data) => {
-                    debug!("Event::ApplicationResponse");
-
-                    // Generate topic (debug)
-                    #[cfg(debug_assertions)]
-                    let sub_topic = format!("d/{}/app/sub/{}", data.uid, data.target);
-
-                    // Generate topic
-                    #[cfg(not(debug_assertions))]
-                    let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
-
-                    // Create a new message
-                    let out = Publish::new(&sub_topic, QoS::AtLeastOnce, data.msg);
-
-                    debug!("Publishing application message to {}", &sub_topic);
-
-                    // Publish to the UID in question
-                    // TODO: wrap this guy up in a separate spawn so it can get back to work.
-                    if let Err(e) = tx.send(Request::Publish(out)).await {
-                        error!("Unable to publish to {}. Error: {}", sub_topic, e);
-                    } else {
-                        debug!("Published..");
-                    }
-                }
-                Event::OtaResponse(update) => {
-                    debug!("mqtt_run: Event::OtaResponse");
-
-                    // Serialize this buddy
-                    let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
-
-                    // Generate topic (debug)
-                    #[cfg(debug_assertions)]
-                    let sub_topic = format!("d/{}/ota/sub", update.uid);
-
-                    // Generate topic
-                    #[cfg(not(debug_assertions))]
-                    let sub_topic = format!("{}/ota/sub", update.uid);
-
-                    // Create a new message
-                    let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
-
-                    debug!("Publishing message to {}", &sub_topic);
-
-                    // Publish to the UID in question
-                    if let Err(e) = tx.send(Request::Publish(msg)).await {
-                        error!("Unable to publish to {}. Error: {}", sub_topic, e);
-                    } else {
-                        debug!("Published..");
-                    }
-                }
-                _ => (),
-            };
-        }
-    });
-
+pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event>) {
     // Loop for recieving messages
     loop {
         if let Ok(incoming) = eventloop.poll().await {
@@ -284,6 +199,89 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
                 }
                 _ => {}
             };
+        };
+    }
+}
+
+pub async fn run(tx: &mut async_channel::Sender<Request>, mut broker_sender: Sender<Event>) {
+    // Get the sender/reciever associated with this particular task
+    let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+
+    // Register this task
+    broker_sender
+        .send(Event::NewRunner {
+            name: "mqtt".to_string(),
+            sender: sender.clone(),
+        })
+        .await
+        .unwrap();
+
+    // Iterate though all potential subscriptions
+    for item in SUBSCRIBE.iter() {
+        // Set up subscription
+        let subscription = Subscribe::new(*item, QoS::AtMostOnce);
+        tx.send(Request::Subscribe(subscription))
+            .await
+            .unwrap_or_else(|e| {
+                println!("Unable to subscribe! Error: {}", e);
+                process::exit(1);
+            });
+    }
+
+    while let Some(event) = reciever.recv().await {
+        // Only process OtaNewPackage eventss
+        match event {
+            Event::ApplicationResponse(data) => {
+                debug!("Event::ApplicationResponse");
+
+                // Generate topic (debug)
+                #[cfg(debug_assertions)]
+                let sub_topic = format!("d/{}/app/sub/{}", data.uid, data.target);
+
+                // Generate topic
+                #[cfg(not(debug_assertions))]
+                let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
+
+                // Create a new message
+                let out = Publish::new(&sub_topic, QoS::AtLeastOnce, data.msg);
+
+                debug!("Publishing application message to {}", &sub_topic);
+
+                // Publish to the UID in question
+                // TODO: wrap this guy up in a separate spawn so it can get back to work.
+                if let Err(e) = tx.send(Request::Publish(out)).await {
+                    error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                } else {
+                    debug!("Published..");
+                }
+            }
+            Event::OtaResponse(update) => {
+                debug!("mqtt_run: Event::OtaResponse");
+
+                // Serialize this buddy
+                let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
+
+                // Generate topic (debug)
+                #[cfg(debug_assertions)]
+                let sub_topic = format!("d/{}/ota/sub", update.uid);
+
+                // Generate topic
+                #[cfg(not(debug_assertions))]
+                let sub_topic = format!("{}/ota/sub", update.uid);
+
+                // Create a new message
+                let msg = Publish::new(&sub_topic, QoS::AtLeastOnce, res);
+
+                debug!("Publishing message to {}", &sub_topic);
+
+                // Publish to the UID in question
+                if let Err(e) = tx.send(Request::Publish(msg)).await {
+                    error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                } else {
+                    debug!("Published..");
+                }
+            }
+            _ => (),
         };
     }
 }
