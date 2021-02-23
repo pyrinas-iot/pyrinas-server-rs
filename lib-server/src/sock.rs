@@ -1,9 +1,6 @@
 // Sytem related
 use log::{debug, error, warn};
 
-// Config related
-use pyrinas_shared::settings::PyrinasSettings;
-
 // Tokio Related
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
@@ -12,6 +9,7 @@ use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{channel, Sender};
 
 // Local lib related
+use pyrinas_shared::settings::PyrinasSettings;
 use pyrinas_shared::Event;
 
 // Cbor
@@ -20,7 +18,7 @@ use serde_cbor;
 // Only requires a sender. No response necessary here... yet.
 pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, _) = channel::<pyrinas_shared::Event>(20);
+  let (sender, _) = channel::<Event>(20);
 
   // Register this task
   broker_sender

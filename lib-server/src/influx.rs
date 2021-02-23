@@ -2,7 +2,7 @@
 use log::{debug, error};
 
 // Config related
-use pyrinas_shared::settings::PyrinasSettings;
+use pyrinas_shared::{settings::PyrinasSettings,Event};
 
 // Tokio + async Related
 use std::sync::Arc;
@@ -11,12 +11,9 @@ use tokio::sync::mpsc::{channel, Sender};
 // Influx Related
 use influxdb::Client;
 
-// Local lib related
-use pyrinas_shared::Event;
-
 pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+  let (sender, mut reciever) = channel::<Event>(20);
 
   // Register this task
   broker_sender

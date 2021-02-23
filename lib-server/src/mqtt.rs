@@ -8,8 +8,8 @@ use std::{env, process};
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
 
-// Config related
-use pyrinas_shared::settings::PyrinasSettings;
+// Shared
+use pyrinas_shared::{settings::PyrinasSettings, Event};
 
 // MQTT related
 use async_channel;
@@ -18,9 +18,6 @@ use rumqttc::{
     Event::{Incoming, Outgoing},
     EventLoop, MqttOptions, Packet, Publish, QoS, Request, Subscribe,
 };
-
-// Local lib related
-use pyrinas_shared::{self, Event};
 
 // Master subscription list for debug
 #[cfg(debug_assertions)]

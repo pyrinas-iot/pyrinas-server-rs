@@ -46,7 +46,7 @@ pub fn add_ota_from_manifest(
   // Get host name
   let file_host = format!("https://{}.s3.amazonaws.com/", &settings.s3.bucket);
 
-  // Data structure (from pyrinas_shared)
+  // Data structure (from pyrinas_lib_shared)
   let new = pyrinas_shared::OtaUpdate {
     uid: s.uid.clone(),
     package: Some(pyrinas_shared::OTAPackage {

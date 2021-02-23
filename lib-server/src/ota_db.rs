@@ -1,14 +1,12 @@
 // System Related
 use log::{debug, error, warn};
 
-// Config related
-use pyrinas_shared::settings::PyrinasSettings;
-
 // Tokio + Async related
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
 
 // Local lib related
+use pyrinas_shared::settings::PyrinasSettings;
 use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
 
 // Todo better way of passing error..
@@ -40,7 +38,7 @@ fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
 // Only requires a sender. No response necessary here... yet.
 pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+  let (sender, mut reciever) = channel::<Event>(20);
 
   // Register this task
   broker_sender
