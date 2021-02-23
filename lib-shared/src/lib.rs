@@ -115,7 +115,6 @@ pub enum Event {
     InfluxDataSave(WriteQuery),                    // Takes a pre-prepared query and executes it
     InfluxDataRequest(ReadQuery), // Takes a pre-prepared query to *read* the database
     InfluxDataResponse,           // Is the response to InfluxDataRequest
-    SledFlush,
 }
 
 #[cfg(test)]

@@ -7,7 +7,6 @@ use pyrinas_shared::settings::PyrinasSettings;
 // Tokio + Async related
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
-use tokio::time::{delay_for, Duration};
 
 // Local lib related
 use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
@@ -55,28 +54,9 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
   // Open the DB
   let tree = sled::open(&settings.ota_db.path).expect("Error opening sled db.");
 
-  // TODO: smarter way to do this?
-  tokio::spawn(async move {
-    loop {
-      // Delay
-      delay_for(Duration::from_secs(10)).await;
-
-      // Flush the database
-      sender.send(Event::SledFlush).await.unwrap();
-    }
-  });
-
   // TODO: wait for event on reciever
   while let Some(event) = reciever.recv().await {
     match event {
-      Event::SledFlush => {
-        debug!("sled_run: Event::SledFlush");
-
-        // Save it to disk
-        if let Err(e) = tree.flush_async().await {
-          error!("Unable to flush tree. Error: {}", e);
-        }
-      }
       // Process OtaRequests
       Event::OtaRequest { uid, msg } => {
         debug!("sled_run: Event::OtaRequest");
@@ -133,6 +113,12 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
             // Remove
             if let Err(e) = tree.remove(&update.uid) {
               warn!("Unable to delete OTA entry. Error: {}", e);
+              continue;
+            }
+
+            // Save it to disk
+            if let Err(e) = tree.flush_async().await {
+              error!("Unable to flush tree. Error: {}", e);
             }
           }
         }
@@ -147,6 +133,11 @@ pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Even
             if let Err(e) = tree.insert(&update.uid, cbor_data) {
               error!("Unable to insert into sled. Error: {}", e);
               continue;
+            }
+
+            // Save it to disk
+            if let Err(e) = tree.flush_async().await {
+              error!("Unable to flush tree. Error: {}", e);
             }
 
             // Notify mqtt to send update!
