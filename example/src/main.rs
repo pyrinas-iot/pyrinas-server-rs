@@ -26,7 +26,7 @@ async fn main() {
     env_logger::init();
 
     // Print out info
-    println!("Pyrinas Server Version: {}", env!("CARGO_PKG_VERSION"));
+    println!("Pyrinas Server Version: {}", crate_version!());
 
     // Get the config path
     let opts: Opts = Opts::parse();
