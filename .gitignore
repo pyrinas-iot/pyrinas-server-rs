@@ -10,4 +10,6 @@ config.toml
 *.sock
 *.crt
 *.key
+.vagrant
+
 *.db
