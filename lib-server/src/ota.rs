@@ -43,7 +43,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
   // Register this task
   broker_sender
     .send_async(Event::NewRunner {
-      name: "sled".to_string(),
+      name: "ota".to_string(),
       sender: sender.clone(),
     })
     .await
