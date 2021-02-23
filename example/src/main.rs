@@ -1,9 +1,9 @@
 // Application
 mod application;
 
-// Tokio + async Related
+// async Related
+use flume::unbounded;
 use std::sync::Arc;
-use tokio::sync::mpsc::channel;
 use tokio::task;
 
 // Command line parsing
@@ -34,11 +34,14 @@ async fn main() {
     // Parse config file
     let settings = match settings::PyrinasSettings::new(opts.config) {
         Ok(s) => Arc::new(s),
-        Err(e) => {println!("Error parsing config file: {}",e); return},
+        Err(e) => {
+            println!("Error parsing config file: {}", e);
+            return;
+        }
     };
 
     // Channels for communication
-    let (broker_sender, broker_reciever) = channel::<Event>(100);
+    let (broker_sender, broker_reciever) = unbounded::<Event>();
 
     // Start (very) basic application
     let task_settings = settings.clone();

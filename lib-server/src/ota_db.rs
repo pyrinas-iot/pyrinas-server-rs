@@ -1,9 +1,9 @@
 // System Related
 use log::{debug, error, warn};
 
-// Tokio + Async related
+// async Related
 use std::sync::Arc;
-use tokio::sync::mpsc::{channel, Sender};
+use flume::{unbounded,Sender};
 
 // Local lib related
 use pyrinas_shared::settings::PyrinasSettings;
@@ -36,13 +36,13 @@ fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, mut reciever) = channel::<Event>(20);
+  let (sender, reciever) = unbounded::<Event>();
 
   // Register this task
   broker_sender
-    .send(Event::NewRunner {
+    .send_async(Event::NewRunner {
       name: "sled".to_string(),
       sender: sender.clone(),
     })
@@ -53,7 +53,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
   let tree = sled::open(&settings.ota_db.path).expect("Error opening sled db.");
 
   // TODO: wait for event on reciever
-  while let Some(event) = reciever.recv().await {
+  while let Ok(event) = reciever.recv_async().await {
     match event {
       // Process OtaRequests
       Event::OtaRequest { uid, msg } => {
@@ -69,7 +69,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
 
             // Send it
             broker_sender
-              .send(Event::OtaDeletePackage(OtaUpdate {
+              .send_async(Event::OtaDeletePackage(OtaUpdate {
                 uid: uid.clone(),
                 package: package,
               }))
@@ -89,7 +89,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
 
             // Send it
             broker_sender
-              .send(Event::OtaResponse(OtaUpdate {
+              .send_async(Event::OtaResponse(OtaUpdate {
                 uid: uid.clone(),
                 package: package,
               }))
@@ -140,7 +140,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
 
             // Notify mqtt to send update!
             broker_sender
-              .send(Event::OtaResponse(update))
+              .send_async(Event::OtaResponse(update))
               .await
               .unwrap();
           }

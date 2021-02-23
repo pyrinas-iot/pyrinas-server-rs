@@ -4,9 +4,9 @@ use std::fs::File;
 use std::io::Read;
 use std::{env, process};
 
-// Tokio async related
+// async related
 use std::sync::Arc;
-use tokio::sync::mpsc::{channel, Sender};
+use flume::{unbounded, Sender};
 
 // Shared
 use pyrinas_shared::{settings::PyrinasSettings, Event};
@@ -85,7 +85,7 @@ pub async fn setup(settings: Arc<PyrinasSettings>) -> EventLoop {
     EventLoop::new(opt, 10)
 }
 
-pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event>) {
+pub async fn mqtt_run(eventloop: &mut EventLoop, broker_sender: Sender<Event>) {
     // Loop for recieving messages
     loop {
         if let Ok(incoming) = eventloop.poll().await {
@@ -139,7 +139,7 @@ pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event
 
                                     // Send message to broker
                                     broker_sender
-                                        .send(Event::OtaRequest {
+                                        .send_async(Event::OtaRequest {
                                             uid: uid.to_string(),
                                             msg: n,
                                         })
@@ -171,7 +171,7 @@ pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event
 
                                     // Send data to broker
                                     broker_sender
-                                        .send(Event::InfluxDataSave(query))
+                                        .send_async(Event::InfluxDataSave(query))
                                         .await
                                         .unwrap();
                                 }
@@ -183,7 +183,7 @@ pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event
 
                             // Send data to broker
                             broker_sender
-                                .send(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
+                                .send_async(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
                                     uid: uid.to_string(),
                                     target: target.to_string(),
                                     msg: msg.payload.to_vec(),
@@ -200,13 +200,13 @@ pub async fn mqtt_run(eventloop: &mut EventLoop, mut broker_sender: Sender<Event
     }
 }
 
-pub async fn run(tx: &mut async_channel::Sender<Request>, mut broker_sender: Sender<Event>) {
+pub async fn run(tx: &mut async_channel::Sender<Request>, broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
-    let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+    let (sender, reciever) = unbounded::<pyrinas_shared::Event>();
 
     // Register this task
     broker_sender
-        .send(Event::NewRunner {
+        .send_async(Event::NewRunner {
             name: "mqtt".to_string(),
             sender: sender.clone(),
         })
@@ -225,7 +225,7 @@ pub async fn run(tx: &mut async_channel::Sender<Request>, mut broker_sender: Sen
             });
     }
 
-    while let Some(event) = reciever.recv().await {
+    while let Ok(event) = reciever.recv_async().await {
         // Only process OtaNewPackage eventss
         match event {
             Event::ApplicationResponse(data) => {

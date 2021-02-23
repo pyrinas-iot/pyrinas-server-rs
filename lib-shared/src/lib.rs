@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use influxdb::{InfluxDbWriteable, ReadQuery, WriteQuery};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
-use tokio::sync::mpsc::Sender;
+use flume::Sender;
 
 // TODO: confirm the name works for each
 // Matches `pyrinas_cloud_telemetry_type_t` in `pyrinas_cloud.h`

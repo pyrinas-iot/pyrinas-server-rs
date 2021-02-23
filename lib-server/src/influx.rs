@@ -4,20 +4,20 @@ use log::{debug, error};
 // Config related
 use pyrinas_shared::{settings::PyrinasSettings,Event};
 
-// Tokio + async Related
+// async Related
 use std::sync::Arc;
-use tokio::sync::mpsc::{channel, Sender};
+use flume::{unbounded,Sender};
 
 // Influx Related
 use influxdb::Client;
 
-pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, mut reciever) = channel::<Event>(20);
+  let (sender, reciever) = unbounded::<Event>();
 
   // Register this task
   broker_sender
-    .send(Event::NewRunner {
+    .send_async(Event::NewRunner {
       name: "influx".to_string(),
       sender: sender.clone(),
     })
@@ -34,7 +34,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
   );
 
   // Process putting new data away
-  while let Some(event) = reciever.recv().await {
+  while let Ok(event) = reciever.recv_async().await {
     // Process telemetry and app data
     match event {
       Event::InfluxDataSave(query) => {

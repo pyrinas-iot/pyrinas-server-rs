@@ -8,10 +8,17 @@ pub mod sock;
 
 pub use pyrinas_shared::*;
 
-// Tokio + async Related
+// Async Related
+use flume::{Receiver, Sender};
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task;
+
+#[cfg(feature = "runtime_tokio")]
+use tokio::{join, task};
+
+#[cfg(feature = "runtime_async_std")]
+use async_macros::join;
+#[cfg(feature = "runtime_async_std")]
+use async_std::task;
 
 // TODO: conditional use of tokio OR async_std
 pub async fn run(
@@ -76,7 +83,7 @@ pub async fn run(
     let broker_task = task::spawn(broker::run(broker_reciever));
 
     // Join hands kids
-    let _join = tokio::join!(
+    let _join = join!(
         ota_db_task,
         influx_task,
         unix_sock_task,

@@ -7,11 +7,11 @@ use s3::{bucket::Bucket,creds::Credentials};
 // Config related
 use pyrinas_shared::{settings::PyrinasSettings,Event};
 
-// Tokio + Async Related
+// Async Related
 use std::sync::Arc;
-use tokio::sync::mpsc::{channel, Sender};
+use flume::{unbounded, Sender};
 
-pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
   // Set up AWS conection
   let credentials = Credentials::new(
     Some(&settings.s3.access_key),
@@ -26,11 +26,11 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
   });
 
   // Get the sender/reciever associated with this particular task
-  let (sender, mut reciever) = channel::<Event>(20);
+  let (sender, reciever) = unbounded::<Event>();
 
   // Register this task
   broker_sender
-    .send(Event::NewRunner {
+    .send_async(Event::NewRunner {
       name: "bucket".to_string(),
       sender: sender.clone(),
     })
@@ -49,7 +49,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
     Bucket::new(&settings.s3.bucket, region, credentials).expect("Unable to create bucket!");
 
   // Wait for event on reciever
-  while let Some(event) = reciever.recv().await {
+  while let Ok(event) = reciever.recv_async().await {
     match event {
       Event::OtaDeletePackage(update) => {
         info!("bucket_run: OtaDeletePackage");
@@ -65,3 +65,6 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
     }
   }
 }
+
+
+// TODO: upload a file and then run this portion of code and delete the data

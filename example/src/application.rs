@@ -4,17 +4,17 @@ use pyrinas_server::{settings::PyrinasSettings, Event};
 // Log
 use log::info;
 
-// Tokio + Async Related
+// async Related
+use flume::{unbounded, Sender};
 use std::sync::Arc;
-use tokio::sync::mpsc::{channel, Sender};
 
-pub async fn run(_settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
-    let (sender, mut reciever) = channel::<Event>(20);
+    let (sender, reciever) = unbounded::<Event>();
 
     // Register this task
     broker_sender
-        .send(Event::NewRunner {
+        .send_async(Event::NewRunner {
             name: "app".to_string(),
             sender: sender.clone(),
         })
@@ -22,7 +22,7 @@ pub async fn run(_settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Even
         .unwrap();
 
     // Wait for event on reciever
-    while let Some(event) = reciever.recv().await {
+    while let Ok(event) = reciever.recv_async().await {
         info!("{:?}", event);
     }
 }

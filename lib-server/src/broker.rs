@@ -2,17 +2,17 @@
 use log::debug;
 use std::collections::hash_map::{Entry, HashMap};
 
-// Tokio related
-use tokio::sync::mpsc::{Receiver, Sender};
+// Channels
+use flume::{Receiver,Sender};
 
 // Local lib related
 use pyrinas_shared::Event;
 
-pub async fn run(mut broker_reciever: Receiver<Event>) {
+pub async fn run(broker_reciever: Receiver<Event>) {
   let mut runners: HashMap<String, Sender<Event>> = HashMap::new();
 
   // Handle broker events
-  while let Some(event) = broker_reciever.recv().await {
+  while let Ok(event) = broker_reciever.recv_async().await {
     match event.clone() {
       // Upon creating a new server thread, the thread has to register with the broker.
       Event::NewRunner { name, sender } => {
@@ -34,7 +34,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("sled")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -43,7 +43,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("mqtt")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -54,7 +54,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("sled")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -65,7 +65,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("influx")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -76,7 +76,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("bucket")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -87,7 +87,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("app")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -98,7 +98,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("sock")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -109,7 +109,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("app")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }
@@ -119,7 +119,7 @@ pub async fn run(mut broker_reciever: Receiver<Event>) {
         runners
           .get_mut("mqtt")
           .unwrap()
-          .send(event.clone())
+          .send_async(event.clone())
           .await
           .unwrap();
       }

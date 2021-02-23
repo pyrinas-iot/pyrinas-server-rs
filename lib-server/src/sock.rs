@@ -1,12 +1,22 @@
 // Sytem related
 use log::{debug, error, warn};
 
-// Tokio Related
+// async Related
 use std::sync::Arc;
+use flume::{unbounded,Sender};
+
+// ?? unix listener
+#[cfg(feature = "runtime_tokio")]
 use tokio::io::AsyncReadExt;
+#[cfg(feature = "runtime_tokio")]
 use tokio::net::UnixListener;
+#[cfg(feature = "runtime_tokio")]
 use tokio::stream::StreamExt;
-use tokio::sync::mpsc::{channel, Sender};
+
+#[cfg(feature = "runtime_async_std")]
+use async_std::os::unix::net::UnixListener;
+#[cfg(feature = "runtime_async_std")]
+use async_std::prelude::*;
 
 // Local lib related
 use pyrinas_shared::settings::PyrinasSettings;
@@ -16,13 +26,13 @@ use pyrinas_shared::Event;
 use serde_cbor;
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (sender, _) = channel::<Event>(20);
+  let (sender, _) = unbounded::<Event>();
 
   // Register this task
   broker_sender
-    .send(Event::NewRunner {
+    .send_async(Event::NewRunner {
       name: "sock".to_string(),
       sender: sender.clone(),
     })
@@ -35,7 +45,12 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
   let _ = std::fs::remove_file(&settings.sock.path);
 
   // Make connection
+  #[cfg(feature = "runtime_tokio")]
   let mut listener = UnixListener::bind(&settings.sock.path).expect("Unable to bind!");
+  #[cfg(feature = "runtime_async_std")]
+  let listener = UnixListener::bind(&settings.sock.path).await.expect("Unable to bind!");
+
+  // Get the incoming
   let mut incoming = listener.incoming();
 
   debug!("Created socket listener!");
@@ -74,7 +89,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
           // Send if decode was successful
           match ota_update {
             Ok(p) => {
-              let _ = broker_sender.send(Event::OtaNewPackage(p)).await;
+              let _ = broker_sender.send_async(Event::OtaNewPackage(p)).await;
             }
             Err(e) => warn!("Unable to get OtaUpdate. Error: {}", e),
           }
@@ -82,7 +97,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
         // Otherwise send all others to application
         _ => {
           if let Err(e) = broker_sender
-            .send(Event::ApplicationManagementRequest(req))
+            .send_async(Event::ApplicationManagementRequest(req))
             .await
           {
             warn!("Unable to send ApplicationManagementRequest. Error: {}", e);
@@ -93,3 +108,6 @@ pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event
     }
   }
 }
+
+// TODO: (test) try to send an "other" managment_request (gets forwarded to the application.)
+// TODO: (test) try to send an "add_ota" command 

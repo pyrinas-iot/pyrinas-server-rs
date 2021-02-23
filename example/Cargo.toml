@@ -11,3 +11,4 @@ env_logger = "0.8" # logging message control using env variable
 log = "0.4" # logging messages
 pyrinas-server = { path = "../lib-server/" }# Local shared for server bits 
 tokio = { version = "0.2", features = ["uds", "io-util"] }
+flume = "0.10" # async channel
