@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{channel, Sender};
 // Local lib related
 use pyrinas_shared::Event;
 
-pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Set up AWS conection
   let credentials = Credentials::new(
     Some(&settings.s3.access_key),

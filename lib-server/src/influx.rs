@@ -14,7 +14,7 @@ use influxdb::Client;
 // Local lib related
 use pyrinas_shared::Event;
 
-pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 

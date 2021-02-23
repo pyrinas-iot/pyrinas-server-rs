@@ -8,7 +8,7 @@ use log::info;
 use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Sender};
 
-pub async fn run(_settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(_settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
     let (sender, mut reciever) = channel::<Event>(20);
 

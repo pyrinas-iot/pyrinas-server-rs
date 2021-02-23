@@ -38,9 +38,9 @@ fn get_ota_package(db: &sled::Db, uid: &str) -> Result<OTAPackage, String> {
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
-  let (mut sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
+  let (sender, mut reciever) = channel::<pyrinas_shared::Event>(20);
 
   // Register this task
   broker_sender

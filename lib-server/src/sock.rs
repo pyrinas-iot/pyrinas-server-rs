@@ -18,7 +18,7 @@ use pyrinas_shared::Event;
 use serde_cbor;
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: &Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
+pub async fn run(settings: Arc<PyrinasSettings>, mut broker_sender: Sender<Event>) {
   // Get the sender/reciever associated with this particular task
   let (sender, _) = channel::<pyrinas_shared::Event>(20);
 
