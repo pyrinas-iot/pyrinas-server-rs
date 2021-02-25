@@ -1,3 +1,5 @@
+server_url = "test.jaredwolff.com"
+
 [influx]
 database = "<DATABASE NAME>"
 host = "<IP>"
@@ -16,11 +18,6 @@ server_cert = "rust-server.crt"
 [sock]
 path = "/tmp/pyrinas.sock"
 
-[s3]
-access_key = "<KEY>"
-bucket = "<BUCKET>"
-region = "us-east-1"
-secret_key = "<SECRET KEY>"
-
-[ota_db]
-path = "./sled.db"
+[ota]
+db_path = "./sled.db"
+http_port = 3030

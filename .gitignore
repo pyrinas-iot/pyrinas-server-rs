@@ -10,7 +10,10 @@ config.toml
 *.sock
 *.crt
 *.key
+# Ignore these folders
+_images
 .vagrant
 
+# Ignore certain files
 *.db
 *.bin

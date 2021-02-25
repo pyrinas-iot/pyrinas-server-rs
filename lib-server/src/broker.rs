@@ -60,14 +60,6 @@ pub async fn run(broker_reciever: Receiver<Event>) {
                     log::error!("{}", e);
                 }
             }
-            Event::OtaDeletePackage(_update) => {
-                debug!("broker_run: OtaDeletePackage");
-
-                // Send to bucket handler
-                if let Err(e) = send("ota", &event, &mut runners).await {
-                    log::error!("{}", e);
-                }
-            }
             Event::ApplicationManagementRequest(_data) => {
                 debug!("broker_run: ApplicationManagementRequest");
 

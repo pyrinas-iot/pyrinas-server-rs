@@ -29,25 +29,18 @@ pub struct Sock {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct S3 {
-  pub access_key: String,
-  pub bucket: String,
-  pub region: String,
-  pub secret_key: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct OtaDb {
-  pub path: String,
+pub struct Ota {
+  pub db_path: String,
+  pub http_port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PyrinasSettings {
+  pub server_url: String,
   pub influx: Influx,
   pub mqtt: Mqtt,
   pub sock: Sock,
-  pub s3: S3,
-  pub ota_db: OtaDb,
+  pub ota: Ota,
 }
 
 impl PyrinasSettings {

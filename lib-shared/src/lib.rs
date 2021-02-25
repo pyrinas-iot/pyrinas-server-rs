@@ -1,10 +1,10 @@
 pub mod settings;
 
 use chrono::{DateTime, Utc};
+use flume::Sender;
 use influxdb::{InfluxDbWriteable, ReadQuery, WriteQuery};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
-use flume::Sender;
 
 // TODO: confirm the name works for each
 // Matches `pyrinas_cloud_telemetry_type_t` in `pyrinas_cloud.h`
@@ -73,6 +73,8 @@ pub struct OTAPackage {
 pub struct OtaUpdate {
     pub uid: String,
     pub package: Option<OTAPackage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

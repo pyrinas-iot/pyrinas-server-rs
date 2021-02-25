@@ -1,6 +1,5 @@
 // Lib related
 pub mod broker;
-pub mod bucket;
 pub mod influx;
 pub mod mqtt;
 pub mod ota;
@@ -35,20 +34,16 @@ pub async fn run(
         influx::run(task_settings, task_sender).await;
     });
 
-    // Clone these appropriately
-    let task_sender = broker_sender.clone();
-    let task_settings = Arc::clone(&settings);
-
-    // Start sled task
-    let bucket_task = task::spawn(async move {
-        bucket::run(task_settings, task_sender).await;
-    });
-
-    // Start sled task
+    // Ota task
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
     let ota_db_task = task::spawn(async move {
         ota::run(task_settings, task_sender).await;
+    });
+
+    let task_settings = settings.clone();
+    let ota_http_task = task::spawn(async move {
+        ota::ota_http_run(task_settings).await;
     });
 
     // Clone these appropriately
@@ -85,11 +80,11 @@ pub async fn run(
     // Join hands kids
     let _join = join!(
         ota_db_task,
+        ota_http_task,
         influx_task,
         unix_sock_task,
         mqtt_server_task,
         mqtt_task,
-        broker_task,
-        bucket_task
+        broker_task
     );
 }
