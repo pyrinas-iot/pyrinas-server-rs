@@ -19,6 +19,9 @@ use async_macros::join;
 #[cfg(feature = "runtime_async_std")]
 use async_std::task;
 
+// MQTT related
+use librumqttd::async_locallink::construct_broker;
+
 // TODO: conditional use of tokio OR async_std
 pub async fn run(
     settings: Arc<settings::PyrinasSettings>,
@@ -55,23 +58,32 @@ pub async fn run(
         sock::run(task_settings, task_sender).await;
     });
 
+    // Set up broker
+    let (mut router, _, rumqtt_server, builder) = construct_broker(settings.mqtt.rumqtt.clone());
+
+    // Spawn router task (needs to be done before anything else or else builder.connect blocks)
+    let mqtt_router_task = task::spawn_blocking(move || {
+        router.start().unwrap();
+    });
+
+    // Get the rx/tx channels
+    let (mut tx, mut rx) = builder.connect("localclient", 200).await.unwrap();
+
+    // Subscribe
+    tx.subscribe(settings.mqtt.topics.clone()).await.unwrap();
+
     // Spawn a new task(s) for the MQTT stuff
     let task_sender = broker_sender.clone();
-    let task_settings = settings.clone();
-
-    // Get eventloop stuff
-    let mut mqtt_eventloop = mqtt::setup(task_settings).await;
-    let mut mqtt_sender = mqtt_eventloop.handle();
 
     // Start server task
     let mqtt_server_task = task::spawn(async move {
-        mqtt::mqtt_run(&mut mqtt_eventloop, task_sender).await;
+        mqtt::mqtt_run(&mut rx, task_sender).await;
     });
 
-    // Start mqtt task
+    // Start mqtt broker task
     let task_sender = broker_sender.clone();
     let mqtt_task = task::spawn(async move {
-        mqtt::run(&mut mqtt_sender, task_sender).await;
+        mqtt::run(&mut tx, task_sender).await;
     });
 
     // Spawn the broker task that handles it all!
@@ -83,8 +95,10 @@ pub async fn run(
         ota_http_task,
         influx_task,
         unix_sock_task,
+        mqtt_router_task,
         mqtt_server_task,
         mqtt_task,
+        rumqtt_server,
         broker_task
     );
 }

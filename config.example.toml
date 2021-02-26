@@ -1,4 +1,4 @@
-server_url = "test.jaredwolff.com"
+server_url = "your.url"
 
 [influx]
 database = "<DATABASE NAME>"
@@ -8,12 +8,36 @@ port = 8086
 user = "<USER>"
 
 [mqtt]
-id = "<YOUR SERVER NAME>"
-ca_cert = "ca.crt"
-host = "<IP>"
-port = 1883
-private_key = "rust-server.key"
-server_cert = "rust-server.crt"
+name = "<NAME>"
+topics = ["#"]
+
+[mqtt.rumqtt]
+id = 0
+
+[mqtt.rumqtt.console]
+port = 3031
+
+[mqtt.rumqtt.router]
+id = 0
+dir = "/tmp/rumqttd"
+max_segment_size = 10240
+max_segment_count = 10
+max_connections = 10001
+
+[mqtt.rumqtt.servers.1]
+port = 8883
+cert_path = "_certs/localhost/localhost.pem"
+key_path = "_certs/localhost/localhost-key.pem"
+ca_path = "_certs/localhost/ca.pem"
+next_connection_delay_ms = 10
+# Tls connections. ca_path enables client authentication
+[mqtt.rumqtt.servers.1.connections]
+connection_timeout_ms = 100
+max_client_id_len = 256
+throttle_delay_ms = 0
+max_payload_size = 5120
+max_inflight_count = 100
+max_inflight_size = 1024
 
 [sock]
 path = "/tmp/pyrinas.sock"

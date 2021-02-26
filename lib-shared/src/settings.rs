@@ -6,41 +6,38 @@ use toml;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Mqtt {
-  pub id: String,
-  pub host: String,
-  pub port: u16,
-  pub ca_cert: String,
-  pub server_cert: String,
-  pub private_key: String,
+    pub name: String,
+    pub topics: Vec<String>,
+    pub rumqtt: librumqttd::Config,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Influx {
-  pub database: String,
-  pub host: String,
-  pub password: String,
-  pub port: u16,
-  pub user: String,
+    pub database: String,
+    pub host: String,
+    pub password: String,
+    pub port: u16,
+    pub user: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Sock {
-  pub path: String,
+    pub path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Ota {
-  pub db_path: String,
-  pub http_port: u16,
+    pub db_path: String,
+    pub http_port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PyrinasSettings {
-  pub server_url: String,
-  pub influx: Influx,
-  pub mqtt: Mqtt,
-  pub sock: Sock,
-  pub ota: Ota,
+    pub server_url: String,
+    pub influx: Influx,
+    pub mqtt: Mqtt,
+    pub sock: Sock,
+    pub ota: Ota,
 }
 
 impl PyrinasSettings {

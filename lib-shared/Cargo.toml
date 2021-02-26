@@ -15,3 +15,4 @@ serde_repr = "0.1"
 toml = "0.5"
 anyhow = "1.0"
 flume = "0.10.2"
+rumqttd = { git = "https://github.com/bytebeamio/rumqtt", rev = "cd8cafe3ecdebe614fd5f0dd002197fa54082008" }# Mqtt core bits
