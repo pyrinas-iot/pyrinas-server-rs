@@ -12,6 +12,7 @@ config.toml
 *.key
 # Ignore these folders
 _images
+_out
 .vagrant
 
 # Ignore certain files

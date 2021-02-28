@@ -75,7 +75,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
                         ) {
                             Ok(p) => p,
                             Err(e) => {
-                                log::error!("Unable to get OTA package: Error: {}", e);
+                                log::info!("Unable to get OTA package: Error: {}", e);
                                 continue;
                             }
                         };
