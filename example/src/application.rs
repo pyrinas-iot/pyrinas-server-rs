@@ -1,8 +1,6 @@
-// Config related
+// Pyrinas related
+use pyrinas_codec_example::EnvironmentData;
 use pyrinas_server::{settings::PyrinasSettings, Event};
-
-// Log
-use log::info;
 
 // async Related
 use flume::{unbounded, Sender};
@@ -23,6 +21,28 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
 
     // Wait for event on reciever
     while let Ok(event) = reciever.recv_async().await {
-        info!("{:?}", event);
+        log::info!("{:?}", event);
+
+        // Match the event. The only one we're interested in is the `ApplicationRequest`
+        match event {
+            Event::ApplicationRequest(req) => {
+                match req.target.as_str() {
+                    "env" => {
+                        // Deserialize data from MQTT clients
+                        let msg: EnvironmentData = match serde_cbor::from_slice(&req.msg) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                log::warn!("Unable to deserialize from MQTT message. Err: {}", e);
+                                continue;
+                            }
+                        };
+
+                        log::info!("{:?}", msg);
+                    }
+                    _ => {}
+                };
+            }
+            _ => {}
+        }
     }
 }
