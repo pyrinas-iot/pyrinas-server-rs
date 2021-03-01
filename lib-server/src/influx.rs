@@ -8,6 +8,9 @@ use pyrinas_shared::{settings::PyrinasSettings,Event};
 use std::sync::Arc;
 use flume::{unbounded,Sender};
 
+#[cfg(feature = "runtime_tokio")]
+use tokio_compat_02::FutureExt;
+
 // Influx Related
 use influxdb::Client;
 
@@ -40,6 +43,12 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
       Event::InfluxDataSave(query) => {
         debug!("influx_run: InfluxDataSave");
         // Create the query. Shows error if it fails
+        #[cfg(feature = "runtime_tokio")]
+        if let Err(e) = client.query(&query).compat().await {
+          error!("Unable to write query. Error: {}", e);
+        }
+
+        #[cfg(feature = "runtime_async_std")]
         if let Err(e) = client.query(&query).await {
           error!("Unable to write query. Error: {}", e);
         }
