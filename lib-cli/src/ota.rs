@@ -43,7 +43,7 @@ pub fn add_ota_from_manifest(
         uid: s.uid.clone(),
         package: Some(pyrinas_shared::OTAPackage {
             version: manifest.version,
-            host: format!("https://{}/ota/", &settings.server_url),
+            host: format!("{}/images/", &settings.ota.url),
             file: manifest.file,
             force: manifest.force,
         }),

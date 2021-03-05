@@ -120,12 +120,20 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
             Event::OtaNewPackage(update) => {
                 log::debug!("sled_run: Event::OtaNewPackage");
 
-                // TODO: Set path in update here, not in CLI..
+                // Set path in update here
+                let package = match update.package {
+                    Some(p) => {
+                        let mut pack = p;
+                        pack.file = format!("{}.bin", &update.uid);
+                        Some(pack)
+                    }
+                    None => None,
+                };
 
                 // Copy only useful stuff in update
                 let update = OtaUpdate {
                     uid: update.uid,
-                    package: update.package,
+                    package: package,
                     image: None,
                 };
 
@@ -214,6 +222,8 @@ async fn delete_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
 /// firmware.
 pub async fn ota_http_run(settings: Arc<PyrinasSettings>) {
     // TODO: for async-std use `tide`
+
+    // TODO: API key for more secure transfers
 
     // Only one folder that we're interested in..
     let images = warp::path("images").and(warp::fs::dir(&IMAGE_FOLDER_PATH));

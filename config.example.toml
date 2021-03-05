@@ -1,5 +1,3 @@
-server_url = "your.url"
-
 [influx]
 database = "<DATABASE NAME>"
 host = "<IP>"
@@ -32,7 +30,7 @@ ca_path = "_certs/localhost/ca.pem"
 next_connection_delay_ms = 10
 # Tls connections. ca_path enables client authentication
 [mqtt.rumqtt.servers.1.connections]
-connection_timeout_ms = 100
+connection_timeout_ms = 65000
 max_client_id_len = 256
 throttle_delay_ms = 0
 max_payload_size = 5120
@@ -43,5 +41,6 @@ max_inflight_size = 1024
 path = "/tmp/pyrinas.sock"
 
 [ota]
+url = "https://your.external.url"
 db_path = "./sled.db"
 http_port = 3030

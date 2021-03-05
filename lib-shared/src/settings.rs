@@ -27,13 +27,13 @@ pub struct Sock {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Ota {
+    pub url: String,
     pub db_path: String,
     pub http_port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PyrinasSettings {
-    pub server_url: String,
     pub influx: Influx,
     pub mqtt: Mqtt,
     pub sock: Sock,
