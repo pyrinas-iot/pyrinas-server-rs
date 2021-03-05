@@ -63,7 +63,9 @@ pub async fn run(
 
     // Spawn router task (needs to be done before anything else or else builder.connect blocks)
     let mqtt_router_task = task::spawn_blocking(move || {
-        router.start().unwrap();
+        if let Err(e) = router.start() {
+            log::error!("mqtt router error. err: {}", e);
+        }
     });
 
     // Get the rx/tx channels
