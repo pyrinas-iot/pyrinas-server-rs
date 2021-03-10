@@ -18,3 +18,8 @@ _out
 # Ignore certain files
 *.db
 *.bin
+
+# Pyrinas related
+Makefile
+rsync
+manifest.json

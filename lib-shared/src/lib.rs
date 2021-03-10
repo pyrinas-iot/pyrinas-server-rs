@@ -90,9 +90,17 @@ pub enum OtaRequestCmd {
     Done,
 }
 
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum ManagmentDataType {
+    Application,
+    AddOta,
+    RemoveOta,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManagementData {
-    pub target: String,
+    pub target: ManagmentDataType,
     pub msg: Vec<u8>,
 }
 

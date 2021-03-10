@@ -1,7 +1,0 @@
-push:
-  # Build results are going to be invalidated on the remote machine.
-  - "target"
-both:
-  # Remove Cargo.lock if creating an executable, leave it for libraries.
-  # More information: http://doc.crates.io/guide.html#cargotoml-vs-cargolock
-  - "/Cargo.lock"

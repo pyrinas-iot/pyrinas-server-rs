@@ -1,7 +1,7 @@
 // async Related
 use flume::{unbounded, Sender};
+use std::io::Write;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::{io::Write, sync::Arc};
 
 // Std
 use std::fs::{self, File};
@@ -10,7 +10,7 @@ use std::fs::{self, File};
 use anyhow::{anyhow, Result};
 
 // Local lib related
-use pyrinas_shared::settings::PyrinasSettings;
+use pyrinas_shared::settings;
 use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
 
 // warp
@@ -36,7 +36,7 @@ fn get_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<OTAPackage> {
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
+pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
     let (sender, reciever) = unbounded::<Event>();
 
@@ -50,7 +50,7 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
         .unwrap();
 
     // Open the DB
-    let db = sled::open(&settings.ota.db_path).expect("Error opening sled db.");
+    let db = sled::open(&settings.db_path).expect("Error opening sled db.");
 
     // Wait for event on reciever
     while let Ok(event) = reciever.recv_async().await {
@@ -120,26 +120,46 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
             Event::OtaNewPackage(update) => {
                 log::debug!("sled_run: Event::OtaNewPackage");
 
-                // Set path in update here
+                // Save image to file before we muck with the OtaUpdate
+                match update.image {
+                    Some(i) => {
+                        if let Err(e) = save_ota_firmware_image(&update.uid, &i).await {
+                            log::error!("Unable to save OTA firmware image. Err: {}", e);
+                            continue;
+                        }
+                    }
+                    None => {
+                        log::error!("Image not valid!");
+                        continue;
+                    }
+                };
+
+                // Now reconfigure the pakcage to include the file and host path
                 let package = match update.package {
                     Some(p) => {
+                        // Need to set the file path.
                         let mut pack = p;
-                        pack.file = format!("{}.bin", &update.uid);
+                        pack.file = format!("images/{}.bin", &update.uid);
+
+                        // Set the server url
+                        pack.host = settings.url.clone();
+
                         Some(pack)
                     }
                     None => None,
                 };
 
-                // Copy only useful stuff in update
+                // Copy only useful stuff in update (no image binary data.)
                 let update = OtaUpdate {
                     uid: update.uid,
                     package: package,
                     image: None,
                 };
 
-                // Save the OTA package to disk
+                // Save the OTA package to database
                 if let Err(e) = save_ota_package(&db, &update).await {
                     log::error!("Unable to save OTA package. Error: {}", e);
+                    continue;
                 }
 
                 // Notify mqtt to send update!
@@ -151,13 +171,35 @@ pub async fn run(settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
             Event::OtaDeletePackage(update) => {
                 log::debug!("bucket_run: OtaDeletePackage");
 
+                if let Err(e) = delete_ota_firmware_image(&update.uid).await {
+                    log::warn!("Unable to delete OTA firmwar image: Error: {}", e);
+                }
+
                 if let Err(e) = delete_ota_package(&db, &update).await {
-                    log::error!("Unable to delete OTA package: Error: {}", e);
+                    log::warn!("Unable to delete OTA package: Error: {}", e);
                 }
             }
             _ => (),
         }
     }
+}
+
+/// Take binary data and save it to the image directory..
+async fn save_ota_firmware_image(name: &str, image: &Vec<u8>) -> Result<()> {
+    let mut file = File::create(format!("{}/{}.bin", IMAGE_FOLDER_PATH, name))?;
+
+    // Write and sync
+    file.write_all(&image)?;
+    file.sync_all()?;
+
+    Ok(())
+}
+
+async fn delete_ota_firmware_image(name: &str) -> Result<()> {
+    // Delete from filesystem
+    fs::remove_file(format!("{}/{}.bin", IMAGE_FOLDER_PATH, &name))?;
+
+    Ok(())
 }
 
 /// Creates the OTA package in the database and filesystem.
@@ -179,22 +221,6 @@ async fn save_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
         }
     }
 
-    // Take binary data and save it to the image directory..
-    {
-        let mut file = File::create(format!("{}/{}.bin", IMAGE_FOLDER_PATH, &update.uid))?;
-
-        // Write and sync
-        match &update.image {
-            Some(i) => {
-                file.write_all(&i)?;
-                file.sync_all()?;
-            }
-            None => {
-                log::error!("No image provided!");
-            }
-        }
-    }
-
     // Turn entry.package into CBOR
     let cbor_data = serde_cbor::ser::to_vec_packed(&update.package)?;
 
@@ -207,9 +233,6 @@ async fn save_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
 
 /// Deletes the OTA package from the database and filesystem.
 async fn delete_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
-    // Delete from filesystem
-    fs::remove_file(format!("{}/{}.bin", IMAGE_FOLDER_PATH, &update.uid))?;
-
     // Delete entry from dB
     db.remove(&update.uid)?;
     db.flush_async().await?;
@@ -220,9 +243,8 @@ async fn delete_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
 /// Small server with one endpoint for handling OTA updates.
 /// i.e. hosts static firmware images that can be pulled by the
 /// firmware.
-pub async fn ota_http_run(settings: Arc<PyrinasSettings>) {
+pub async fn ota_http_run(settings: &settings::Ota) {
     // TODO: for async-std use `tide`
-
     // TODO: API key for more secure transfers
 
     // Only one folder that we're interested in..
@@ -232,7 +254,7 @@ pub async fn ota_http_run(settings: Arc<PyrinasSettings>) {
     warp::serve(images)
         .run(SocketAddrV4::new(
             Ipv4Addr::new(127, 0, 0, 1),
-            settings.ota.http_port,
+            settings.http_port,
         ))
         .await;
 }
@@ -264,7 +286,7 @@ mod tests {
 
         // Update
         let update = OtaUpdate {
-            uid: "1234".to_string(),
+            uid: "4".to_string(),
             package: Some(OTAPackage {
                 version: OTAPackageVersion {
                     major: 1,
@@ -321,7 +343,7 @@ mod tests {
 
         // Update
         let update = OtaUpdate {
-            uid: "1234".to_string(),
+            uid: "3".to_string(),
             package: Some(package),
             image: Some(image.to_vec()),
         };
@@ -333,7 +355,7 @@ mod tests {
         }
 
         let update = OtaUpdate {
-            uid: "1234".to_string(),
+            uid: "3".to_string(),
             package: None,
             image: None,
         };
@@ -380,7 +402,7 @@ mod tests {
 
         // Update
         let update = OtaUpdate {
-            uid: "1234".to_string(),
+            uid: "2".to_string(),
             package: Some(package),
             image: Some(image.to_vec()),
         };
@@ -391,8 +413,17 @@ mod tests {
             assert!(false);
         }
 
+        // Save the image to disk
+        if let Err(e) = save_ota_firmware_image(&update.uid, &image.to_vec()).await {
+            log::error!("Error: {}", e);
+            assert!(false);
+        }
+
         // Delete the package
         let res = delete_ota_package(&db, &update).await;
+        assert!(res.is_ok());
+
+        let res = delete_ota_firmware_image(&update.uid).await;
         assert!(res.is_ok());
     }
 
@@ -405,7 +436,7 @@ mod tests {
         let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
 
         let update = OtaUpdate {
-            uid: "1234".to_string(),
+            uid: "1".to_string(),
             package: None,
             image: None,
         };
@@ -413,6 +444,9 @@ mod tests {
         // Delete the package
         let res = delete_ota_package(&db, &update).await;
         log::info!("{:?}", res);
+        assert!(res.is_ok());
+
+        let res = delete_ota_firmware_image(&update.uid).await;
         assert!(res.is_err());
     }
 }

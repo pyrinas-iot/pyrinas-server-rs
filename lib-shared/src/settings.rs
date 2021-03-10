@@ -20,9 +20,13 @@ pub struct Influx {
     pub user: String,
 }
 
+/// Struct for Admin interface
 #[derive(Debug, Deserialize, Clone)]
-pub struct Sock {
-    pub path: String,
+pub struct Admin {
+    /// Port for the Websocket admin interface
+    pub port: u16,
+    /// Api key for Admin interface
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -34,9 +38,9 @@ pub struct Ota {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PyrinasSettings {
-    pub influx: Influx,
+    pub influx: Option<Influx>,
     pub mqtt: Mqtt,
-    pub sock: Sock,
+    pub admin: Option<Admin>,
     pub ota: Ota,
 }
 

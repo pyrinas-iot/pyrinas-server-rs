@@ -1,9 +1,9 @@
 // Lib related
+pub mod admin;
 pub mod broker;
 pub mod influx;
 pub mod mqtt;
 pub mod ota;
-pub mod sock;
 
 pub use pyrinas_shared::*;
 
@@ -12,10 +12,8 @@ use flume::{Receiver, Sender};
 use std::sync::Arc;
 
 #[cfg(feature = "runtime_tokio")]
-use tokio::{join, task};
+use tokio::task;
 
-#[cfg(feature = "runtime_async_std")]
-use async_macros::join;
 #[cfg(feature = "runtime_async_std")]
 use async_std::task;
 
@@ -27,26 +25,28 @@ pub async fn run(
     settings: Arc<settings::PyrinasSettings>,
     broker_sender: Sender<Event>,
     broker_reciever: Receiver<Event>,
-) {
+) -> anyhow::Result<()> {
     // Clone these appropriately
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
 
     // Init influx connection
-    let influx_task = task::spawn(async move {
-        influx::run(task_settings, task_sender).await;
-    });
+    if settings.clone().influx.is_some() {
+        task::spawn(async move {
+            influx::run(&task_settings.influx.to_owned().unwrap(), task_sender).await;
+        });
+    }
 
     // Ota task
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
-    let ota_db_task = task::spawn(async move {
-        ota::run(task_settings, task_sender).await;
+    task::spawn(async move {
+        ota::run(&task_settings.ota, task_sender).await;
     });
 
     let task_settings = settings.clone();
-    let ota_http_task = task::spawn(async move {
-        ota::ota_http_run(task_settings).await;
+    task::spawn(async move {
+        ota::ota_http_run(&task_settings.ota).await;
     });
 
     // Clone these appropriately
@@ -54,15 +54,25 @@ pub async fn run(
     let task_settings = settings.clone();
 
     // Start unix socket task
-    let unix_sock_task = task::spawn(async move {
-        sock::run(task_settings, task_sender).await;
-    });
+    if let Some(_) = task_settings.admin {
+        task::spawn(async move {
+            if let Err(e) = admin::run(&task_settings.admin.to_owned().unwrap(), task_sender).await
+            {
+                log::error!("Admin runtime error! Err: {}", e);
+            };
+        });
+    }
 
     // Set up broker
     let (mut router, _, rumqtt_server, builder) = construct_broker(settings.mqtt.rumqtt.clone());
 
+    // Running switch
+    task::spawn(async {
+        rumqtt_server.await;
+    });
+
     // Spawn router task (needs to be done before anything else or else builder.connect blocks)
-    let mqtt_router_task = task::spawn_blocking(move || {
+    task::spawn_blocking(move || {
         if let Err(e) = router.start() {
             log::error!("mqtt router error. err: {}", e);
         }
@@ -78,29 +88,20 @@ pub async fn run(
     let task_sender = broker_sender.clone();
 
     // Start server task
-    let mqtt_server_task = task::spawn(async move {
+    task::spawn(async move {
         mqtt::mqtt_run(&mut rx, task_sender).await;
     });
 
     // Start mqtt broker task
     let task_sender = broker_sender.clone();
-    let mqtt_task = task::spawn(async move {
+    task::spawn(async move {
         mqtt::run(&mut tx, task_sender).await;
     });
 
     // Spawn the broker task that handles it all!
-    let broker_task = task::spawn(broker::run(broker_reciever));
+    // This blocks this async function from returning.
+    // If this returns, the server it shot anyway..
+    task::spawn(broker::run(broker_reciever)).await?;
 
-    // Join hands kids
-    let _join = join!(
-        ota_db_task,
-        ota_http_task,
-        influx_task,
-        unix_sock_task,
-        mqtt_router_task,
-        mqtt_server_task,
-        mqtt_task,
-        rumqtt_server,
-        broker_task
-    );
+    Ok(())
 }
