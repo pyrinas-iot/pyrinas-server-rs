@@ -9,7 +9,7 @@ use flume::{Receiver, Sender};
 use anyhow::{anyhow, Result};
 
 // Local lib related
-use pyrinas_shared::Event;
+use crate::Event;
 
 pub async fn run(broker_reciever: Receiver<Event>) {
     let mut runners: HashMap<String, Sender<Event>> = HashMap::new();

@@ -4,8 +4,13 @@ pub mod broker;
 pub mod influx;
 pub mod mqtt;
 pub mod ota;
+pub mod settings;
+pub mod telemetry;
 
 pub use pyrinas_shared::*;
+
+// Influx/Event
+use influxdb::{ReadQuery, WriteQuery};
 
 // Async Related
 use flume::{Receiver, Sender};
@@ -104,4 +109,20 @@ pub async fn run(
     task::spawn(broker::run(broker_reciever)).await?;
 
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    NewRunner { name: String, sender: Sender<Event> },
+    OtaDeletePackage(OtaUpdate),
+    OtaNewPackage(OtaUpdate),
+    OtaRequest { uid: String, msg: OtaRequest },
+    OtaResponse(OtaUpdate),
+    ApplicationManagementRequest(ManagementData), // Message sent for configuration of application
+    ApplicationManagementResponse(ManagementData), // Reponse from application management portion of the app
+    ApplicationRequest(ApplicationData),           // Request/event from a device
+    ApplicationResponse(ApplicationData),          // Reponse from other parts of the server
+    InfluxDataSave(WriteQuery),                    // Takes a pre-prepared query and executes it
+    InfluxDataRequest(ReadQuery), // Takes a pre-prepared query to *read* the database
+    InfluxDataResponse,           // Is the response to InfluxDataRequest
 }

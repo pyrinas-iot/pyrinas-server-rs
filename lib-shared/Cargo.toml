@@ -8,11 +8,5 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4"
-influxdb = { version = "0.3", features = ["derive"] } # InfluxDB access
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing
 serde_repr = "0.1"
-toml = "0.5"
-anyhow = "1.0"
-flume = "0.10.2"
-rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option", default-features = false, features = ["use-native-tls"] } # Mqtt core bits

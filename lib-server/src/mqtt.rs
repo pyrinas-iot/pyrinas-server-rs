@@ -5,7 +5,8 @@ use log::{debug, error, warn};
 use flume::{unbounded, Sender};
 
 // Shared
-use pyrinas_shared::Event;
+use crate::telemetry;
+use crate::Event;
 
 // Mqttd
 use librumqttd::async_locallink::{AsyncLinkRx, AsyncLinkTx};
@@ -90,7 +91,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                 }
                 "tel" => {
                     // Get the telemetry data
-                    let res: Result<pyrinas_shared::TelemetryData, serde_cbor::error::Error>;
+                    let res: Result<telemetry::TelemetryData, serde_cbor::error::Error>;
 
                     // Get the result
                     res = serde_cbor::from_slice(&payload);
@@ -135,7 +136,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
 
 pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
     // Get the sender/reciever associated with this particular task
-    let (sender, reciever) = unbounded::<pyrinas_shared::Event>();
+    let (sender, reciever) = unbounded::<Event>();
 
     // Register this task
     broker_sender

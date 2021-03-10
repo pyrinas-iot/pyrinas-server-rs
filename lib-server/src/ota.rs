@@ -10,8 +10,8 @@ use std::fs::{self, File};
 use anyhow::{anyhow, Result};
 
 // Local lib related
-use pyrinas_shared::settings;
-use pyrinas_shared::{Event, OTAPackage, OtaRequestCmd, OtaUpdate};
+use crate::{settings, Event};
+use pyrinas_shared::{OTAPackage, OtaRequestCmd, OtaUpdate};
 
 // warp
 use warp::{self, Filter};

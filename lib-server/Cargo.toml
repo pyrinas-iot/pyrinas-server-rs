@@ -17,7 +17,7 @@ path = "src/bin/example/server.rs"
 [dependencies]
 clap = "3.0.0-beta.2" # CLI Library
 env_logger = "0.8" # logging message control using env variable
-influxdb = { version = "0.3", features = ["derive"] } # InfluxDB access 
+influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
 log = "0.4" # logging messages
 pyrinas-shared = { path = "../lib-shared/" } # Local shared for settings, etc 
 rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option", default-features = false, features = ["use-native-tls"] } # Mqtt core bits
@@ -29,6 +29,9 @@ flume = "0.10.2" # Channels
 cfg-if = "1.0.0" # Macro config
 anyhow = "1.0" # Generic error
 futures = "0.3.13" # Need to split WS
+toml = "0.5.8" # for config purposes
+chrono = "0.4" # for time
+
 
 # Codec
 pyrinas-codec-example = { path = "../lib-codec-example/" }

@@ -2,7 +2,7 @@
 use log::{debug, error};
 
 // Config related
-use pyrinas_shared::{settings, Event};
+use crate::{settings, Event};
 
 // async Related
 use flume::{unbounded, Sender};
