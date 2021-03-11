@@ -4,12 +4,12 @@ All notable changes to this project will be documented in this file. This file a
 
 ## [Unreleased]
 
-### Addded
+### Added
+* Detailed documentation and the skeleton of further detailed how-to in the `docs` folder.
+* Github configuration in `.github`
 
 ### Changed
-* Moved items out of `lib-shared` that aren't necessary. This reduces build time of `pyrinas-cli` significantly (~250+ packages down to 113)
-
-### Removed
+* Moved items out of `lib-shared` that aren't necessary. This reduces build time of `pyrinas-cli` significantly (~250+ packages down to ~115)
 
 ## [0.2.2] - 3/7/2021
 

@@ -1,78 +1,106 @@
-# Pyrinas Server
+# Pyrinas Server & CLI
 
-## Building Development Release
+![Pyrinas Logo](docs/img/pyrinas-logo-crab.png)
 
-```
-cargo build
-```
+For the latest changes, check out the [changelog](Changelog.md). 
 
-Result will be placed in `target/debug`
+Interested how all the pieces fit together? Check out the [architecture](Architecture.md);
 
-## Building Production Release
+## What is Pyrinas Server?
 
-```
-cargo build --release
-```
+Pyrinas, means core or nucleus in Greek (pronounced pir-inas). It's meant to be used as the core server application that conects the [nRF9160 Feather](https://www.jaredwolff.com/store/nrf9160-feather/) and boards like it to the cloud via MQTT. 
 
-The release will be placed in `target/release`. As of this writing
-the bin is called `pyrinas-server`.
+It currently includes the abillity to:
+
+1. Save, publish and facilitate OTA updates via a self-serve HTTP endpoint
+2. Publish sensor data on to a separate InfluxDB instance (Optional)
+3. Act as a secure MQTT broker (thanks to [rumqttd](https://github.com/bytebeamio/rumqtt)) utilitzing Rusts's `native_tls` 
+4. Provides an admin interface using WebSockets for configuring the server, uploading OTA updates, etc. (Optional but recommended)
+5. Tested and works well with reverse proxies like Caddy
+
+Pyrinas is also meant to integrate with the Zephyr module implementation for easy publishing of device data. For more information check out [that repository.](https://github.com/pyrinas-iot/pyrinas-zephyr)
+
+While you can run the example server on it's own, this library ultimately allows you to integrate your own project logic, web servers, frontends and backends. The possiblities are endless!
+
+### What this project is
+
+* Scafolding and pre-tested components for deploying nRF9160 + Zephyr devices with relative ease.
+* Meant for small-medium deployments
+
+### What this not
+
+* A one-size fit all implementation for all IoT Devices
+* Pre-configurable server with all the features and protocols (not yet at least!)
+
+## Running the example server & CLI
+
+While this is more of a library than an executable, you can compile and run the included examples to get an idea of how things work. For more info check out [Using the Example](docs/using-the-example.md) for a step-by-step guide.
 
 
-## .env file
+### Using `cross`
 
-Currently the `.env` file defines what the server does and how it operates. An example can be found in `.env.sample`
+You can use [`cross`](https://github.com/rust-embedded/cross) to build cross-compiled versions of Pyrinas.
 
-## Set the log level for `env_logger`
-
-
-The `pyrinas-server` example uses `env_logger`. In order to see output make sure the `RUST_LOG`  environment variable is set
-
-```
-$ export RUST_LOG=info
-```
-
-
-## Generating OTA Manifest file
-
-In order to generate a manifest file you'll need `deno` installed. On OSX run:
-
-```
-brew install deno
-```
-
-For other platforms see the [documentation](https://deno.land/#installation).
-
-Then, in your Pyrinas firmware directory run:
-
-```
-> deno run --allow-run --allow-write manifest-generator.ts
-```
-
-It will spit out some results for your review:
+Once you have it installed simply invoke `cross` as if you would `cargo`
 
 ```
-❯ deno run --allow-run --allow-write manifest-generator.ts
-Check file:///.../manifest-generator.ts
-version 0.1.0-6-g74b7376
-manifest generated!
-{
-  version: {
-    major: 0,
-    minor: 1,
-    patch: 0,
-    commit: 6,
-    hash: [
-      103, 55, 52, 98,
-       55, 51, 55, 54
-    ]
-  },
-  file: "app_update.bin",
-  force: false
-}
-File written to ./manifest.json
+> cross build --package pyrinas-cli --target x86_64-unknown-freebsd
 ```
+
+While `cross` is a handy tool, it takes almost 3 times as long to build a FreeBSD target using `cross`'s Docker based container than simply building it in a FreeBSD VM. (2015 MBP - 16GB Ram)
+
+**Note:** the default target is `x86_64-unknown-freebsd` and is configured in `Cross.toml`.
+
+**Another note** if you do know how to speed Docker based builds up i'm all eyes & ears!
+
+## Configuring the Server
+
+Pyrinas uses TOML for it's configuration. There is an example TOML file included in this repository. (`config.example.toml`)
+
+For more details on running the included example. Check out [Configuring Pyrinas Server](docs/configuring-server.md).
+
+## Configuring the CLI
+
+The first time you run the CLI you should cofigure your admin address and API key.
+
+The **address** is where you can safely access your admin endpoint. Highly recommended to have this behind a TLS reverse proxy. Alternatively, don't expose the endpoint at all and access safely behind a VPN like `wireguard`.
+
+The **api key** is set within the server's **confg.toml**. It's recommended to make it long and not easily guessable/bruteforceable. 
+
+```
+> pyrinas-cli config install admin.yourdomain.com <YOUR API KEY>
+```
+
+This will place a CLI configuration in your $HOME/.pyrinas/ folder. You can always re-run the command to overwrite the previous configuration if something changes. 
+
+
+## What's on deck?
+
+Here's what's on my plate and what's to come:
+
+- [x] Serving OTA updates from CLI all the way to a test device
+- [ ] Provide clear documentation for current exmaples 
+  - [ ] For server side
+    - [ ] Example of full workng setup (and the steps to complete it)
+  - [ ] CLI 
+  - [ ] Zephyr side as well
+- [ ] Uploading an OTA package directly from Zephyr based repository
+ - [ ] Clean build checks
+- [ ] Implement more tests around:
+ - [ ] Broker and optional broker capabilties 
+ - [ ] Better coverage in OTA
+ - [ ] Better coverage in Mqtt
+ - [ ] Better coverage in Admin area
+- [ ] More functionality/control for Admin
+
+## Don't see what you're looking for?
+
+Consider creating a feature request and supporting this project by [purchasing hardware](https://www.jaredwolff.com/store/nrf9160-feather/).
 
 ## License
 
-This repository has an Apache 2.0 license. Contributions will be licensed the same
-with no additional terms or conditions. See `LICEENSE` file for more information.
+This repository has an Apache 2.0 license. Contributions will be licensed the same with no additional terms or conditions. See `LICEENSE` file for more information.
+
+## Attribution
+
+Crab icon made by [Flat Icons](https://www.flaticon.com/authors/flat-icons)
