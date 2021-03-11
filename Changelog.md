@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. This file adheres to the format of [keep a changelog.](https://keepachangelog.com/en/1.0.0/)
 
-## [Unreleased]
+## [0.2.3] - 3/10/2021
 
 ### Added
 * Detailed documentation and the skeleton of further detailed how-to in the `docs` folder.
@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file. This file a
 
 ### Changed
 * Moved items out of `lib-shared` that aren't necessary. This reduces build time of `pyrinas-cli` significantly (~250+ packages down to ~115)
+* Updated to `influxdb` 0.4.0
 
 ## [0.2.2] - 3/7/2021
 

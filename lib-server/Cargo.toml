@@ -2,8 +2,12 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-server"
-version = "0.2.2"
+version = "0.2.3"
 license = "Apache-2.0"
+description = "IoT Server with built-in OTA support and data logging capabilities."
+repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
+readme = "https://raw.githubusercontent.com/pyrinas-iot/pyrinas-server-rs/main/Readme.md"
+keywords = ["ota", "mqtt", "iot"]
 
 [features]
 default = ["runtime_tokio"]
@@ -19,7 +23,7 @@ clap = "3.0.0-beta.2" # CLI Library
 env_logger = "0.8" # logging message control using env variable
 influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
 log = "0.4" # logging messages
-pyrinas-shared = { path = "../lib-shared/" } # Local shared for settings, etc 
+pyrinas-shared = { version = "0.2", path = "../lib-shared/" } # Local shared for settings, etc 
 rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option", default-features = false, features = ["use-native-tls"] } # Mqtt core bits
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
 serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
@@ -34,7 +38,7 @@ chrono = "0.4" # for time
 
 
 # Codec
-pyrinas-codec-example = { path = "../lib-codec-example/" }
+pyrinas-codec-example = { version = "0.1", path = "../lib-codec-example/" }
 
 # Optional features
 tokio = { version = "1.0", default-features = false, features = ["net", "rt", "macros", "io-util"], optional = true } # async runtime

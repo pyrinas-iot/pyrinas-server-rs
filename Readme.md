@@ -99,7 +99,7 @@ Consider creating a feature request and supporting this project by [purchasing h
 
 ## License
 
-This repository has an Apache 2.0 license. Contributions will be licensed the same with no additional terms or conditions. See `LICEENSE` file for more information.
+This repository has an Apache 2.0 license. Contributions will be licensed the same with no additional terms or conditions. See `LICENSE` file for more information.
 
 ## Attribution
 
