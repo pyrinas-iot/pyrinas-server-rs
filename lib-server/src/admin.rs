@@ -47,7 +47,7 @@ async fn handle_connection(broker_sender: Sender<Event>, websocket: WebSocket) {
             serde_cbor::from_slice(&msg.as_bytes()).expect("Unable to deserialize ManagementData");
 
         // Next step in the managment request process
-        match req.target {
+        match req.cmd {
             ManagmentDataType::AddOta => {
                 // Dedcode ota update
                 let ota_update: pyrinas_shared::OtaUpdate =

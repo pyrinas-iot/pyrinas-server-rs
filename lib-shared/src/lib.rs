@@ -51,7 +51,8 @@ pub enum ManagmentDataType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManagementData {
-    pub target: ManagmentDataType,
+    pub cmd: ManagmentDataType,
+    pub target: Option<String>,
     pub msg: Vec<u8>,
 }
 

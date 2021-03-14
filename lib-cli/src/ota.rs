@@ -56,7 +56,8 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> anyho
 
     // Then configure the outer data
     let msg = pyrinas_shared::ManagementData {
-        target: pyrinas_shared::ManagmentDataType::AddOta,
+        cmd: pyrinas_shared::ManagmentDataType::AddOta,
+        target: None,
         msg: data,
     };
 
