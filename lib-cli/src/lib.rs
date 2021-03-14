@@ -12,6 +12,16 @@ use semver::Version;
 // Websocket
 use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
 
+/// Various commands related to the OTA process
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub enum OtaCmd {
+    /// Add OTA package
+    Add(OtaAdd),
+    /// Remove OTA package
+    Remove(OtaRemove),
+}
+
 /// Add a new OTA package to the sever
 #[derive(Clap, Debug)]
 #[clap(version = crate_version!())]

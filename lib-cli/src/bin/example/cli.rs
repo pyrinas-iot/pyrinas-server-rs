@@ -1,6 +1,6 @@
 use clap::{crate_version, Clap};
 use pyrinas_cli::ota;
-use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaAdd, OtaRemove};
+use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
 // use url::Url;
 
 /// This doc string acts as a help message when the user runs '--help'
@@ -15,8 +15,7 @@ struct Opts {
 #[derive(Clap)]
 #[clap(version = crate_version!())]
 enum SubCommand {
-    Add(OtaAdd),
-    Remove(OtaRemove),
+    Ota(OtaCmd),
     Config(ConfigCmd),
 }
 
@@ -32,54 +31,60 @@ fn main() {
 
     // Process command.
     match opts.subcmd {
-        SubCommand::Add(s) => {
-            // Check if config is valid
-            let config = match config {
-                Ok(c) => c,
-                Err(_e) => {
-                    eprintln!("Unable to get config. Run \"init\" command before you continue.");
+        SubCommand::Ota(c) => match c {
+            OtaCmd::Add(s) => {
+                // Check if config is valid
+                let config = match config {
+                    Ok(c) => c,
+                    Err(_e) => {
+                        eprintln!(
+                            "Unable to get config. Run \"init\" command before you continue."
+                        );
+                        return;
+                    }
+                };
+
+                // Get socket
+                let mut socket = match pyrinas_cli::get_socket(&config) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        return;
+                    }
+                };
+
+                // Then process
+                if let Err(e) = crate::ota::add_ota(&mut socket, &s) {
+                    eprintln!("Err: {}", e);
                     return;
-                }
-            };
+                };
 
-            // Get socket
-            let mut socket = match pyrinas_cli::get_socket(&config) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return;
-                }
-            };
+                println!("OTA image successfully uploaded!");
+            }
+            OtaCmd::Remove(_r) => {
+                // Check if config is valid
+                let config = match config {
+                    Ok(c) => c,
+                    Err(_e) => {
+                        eprintln!(
+                            "Unable to get config. Run \"init\" command before you continue."
+                        );
+                        return;
+                    }
+                };
 
-            // Then process
-            if let Err(e) = crate::ota::add_ota(&mut socket, &s) {
-                eprintln!("Err: {}", e);
-                return;
-            };
+                // Get socket
+                let mut _socket = match pyrinas_cli::get_socket(&config) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        return;
+                    }
+                };
 
-            println!("OTA image successfully uploaded!");
-        }
-        SubCommand::Remove(_r) => {
-            // Check if config is valid
-            let config = match config {
-                Ok(c) => c,
-                Err(_e) => {
-                    eprintln!("Unable to get config. Run \"init\" command before you continue.");
-                    return;
-                }
-            };
-
-            // Get socket
-            let mut _socket = match pyrinas_cli::get_socket(&config) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return;
-                }
-            };
-
-            // TODO: run the remove function
-        }
+                // TODO: run the remove function
+            }
+        },
         SubCommand::Config(c) => {
             match c.subcmd {
                 ConfigSubCommand::Show(_) => {
