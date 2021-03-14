@@ -1,35 +1,40 @@
-use crate::OTAManifest;
+// Anyhow
+use anyhow::anyhow;
 
 // Cbor
 use serde_cbor;
 
 // Std lib
 use std::fs::File;
-use std::io::{prelude::*, BufReader};
+use std::io::prelude::*;
 
 // Websocket
 use tungstenite::{client::AutoStream, protocol::WebSocket, Message};
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota_from_manifest(
-    stream: &mut WebSocket<AutoStream>,
-    req: &crate::OtaAdd,
-) -> anyhow::Result<()> {
-    // Open the file in read-only mode with buffer.
-    let file = File::open(&req.manifest)?;
-    let reader = BufReader::new(file);
+pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> anyhow::Result<()> {
+    // Get the current version using 'git describe'
+    let ver = crate::get_git_describe()?;
 
-    // Read manifest file
-    let manifest: OTAManifest = serde_json::from_reader(reader)?;
+    // Then parse it to get OTAPackageVersion
+    let (ver, dirty) = crate::get_ota_package_version(&ver)?;
 
-    println!(
-        "Adding new update for: {} on device: {}",
-        manifest.file, req.uid
-    );
+    // Force error
+    if dirty && !req.force {
+        return Err(anyhow!("Repository is dirty. Run --force to override."));
+    }
+
+    println!("Adding new update for {}", req.uid);
+
+    // Path for ota
+    let path = "./build/zephyr/app_update.bin";
 
     // Read image in as data
     let mut buf: Vec<u8> = Vec::new();
-    let mut file = File::open(&manifest.file)?;
+    let mut file = match File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return Err(anyhow!("Unable to find firmware file in {}", path)),
+    };
     let size = file.read_to_end(&mut buf)?;
 
     println!("Reading {} bytes from firmware update binary.", size);
@@ -38,7 +43,7 @@ pub fn add_ota_from_manifest(
     let new = pyrinas_shared::OtaUpdate {
         uid: req.uid.clone(),
         package: Some(pyrinas_shared::OTAPackage {
-            version: manifest.version,
+            version: ver,
             host: "".to_string(),
             file: "".to_string(),
             force: req.force,

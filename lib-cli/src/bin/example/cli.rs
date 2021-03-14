@@ -52,8 +52,8 @@ fn main() {
             };
 
             // Then process
-            if let Err(e) = crate::ota::add_ota_from_manifest(&mut socket, &s) {
-                eprintln!("Unable to add OTA using Manifest. Err: {}", e);
+            if let Err(e) = crate::ota::add_ota(&mut socket, &s) {
+                eprintln!("Err: {}", e);
                 return;
             };
 

@@ -3,7 +3,11 @@ pub mod ota;
 use anyhow::anyhow;
 use clap::{crate_version, Clap};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{convert::TryInto, path::PathBuf};
+
+// Getting git repo information
+use git2::{DescribeFormatOptions, DescribeOptions, Repository};
+use semver::Version;
 
 // Websocket
 use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
@@ -14,8 +18,6 @@ use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
 pub struct OtaAdd {
     /// UID to be directed to
     pub uid: String,
-    /// JSON manifest file
-    pub manifest: String,
     // Force the update
     #[clap(long, short)]
     pub force: bool,
@@ -67,6 +69,76 @@ pub struct OTAManifest {
     pub version: pyrinas_shared::OTAPackageVersion,
     pub file: String,
     pub force: bool,
+}
+
+pub fn get_git_describe() -> anyhow::Result<String> {
+    let mut path = std::env::current_dir()?;
+
+    let repo: Repository;
+
+    // Recursively go up levels to see if there's a .git folder and then stop
+    loop {
+        repo = match Repository::open(path.clone()) {
+            Ok(repo) => repo,
+            Err(_e) => {
+                if !path.pop() {
+                    return Err(anyhow!("Could not find repo!"));
+                }
+
+                continue;
+            }
+        };
+
+        break;
+    }
+
+    // Describe options
+    let mut opts = DescribeOptions::new();
+    let opts = opts.describe_all().describe_tags();
+
+    // Describe format
+    let mut desc_format_opts = DescribeFormatOptions::new();
+    desc_format_opts
+        .always_use_long_format(true)
+        .dirty_suffix("-dirty");
+
+    // Describe string!
+    let des = repo.describe(&opts)?.format(Some(&desc_format_opts))?;
+
+    Ok(des)
+}
+
+pub fn get_ota_package_version(
+    ver: &str,
+) -> anyhow::Result<(pyrinas_shared::OTAPackageVersion, bool)> {
+    // Parse the version
+    let version = Version::parse(ver)?;
+
+    log::info!("ver: {:?}", version);
+
+    // Then convert it to an OTAPackageVersion
+    let dirty = ver.contains("dirty");
+    let pre: Vec<&str> = ver.split('-').collect();
+    let commit: u8 = pre[1].parse()?;
+    let hash: [u8; 8] = get_hash(pre[2].as_bytes().to_vec())?;
+
+    Ok((
+        pyrinas_shared::OTAPackageVersion {
+            major: version.major as u8,
+            minor: version.minor as u8,
+            patch: version.patch as u8,
+            commit: commit,
+            hash: hash,
+        },
+        dirty,
+    ))
+}
+
+fn get_hash(v: Vec<u8>) -> anyhow::Result<[u8; 8]> {
+    match v.try_into() {
+        Ok(r) => Ok(r),
+        Err(_e) => Err(anyhow!("Unable to convert hash.")),
+    }
 }
 
 pub fn get_socket(config: &Config) -> anyhow::Result<WebSocket<AutoStream>> {
@@ -142,4 +214,108 @@ fn get_config_path() -> anyhow::Result<PathBuf> {
 
     // Return it
     Ok(config_path)
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    /// Setup function that is only run once, even if called multiple times.
+    fn setup() {
+        INIT.call_once(|| env_logger::init());
+    }
+
+    #[test]
+    fn get_ota_package_version_success_with_dirty() {
+        // Log setup
+        setup();
+
+        let ver = "0.2.1-19-g09db6ef-dirty";
+
+        let res = get_ota_package_version(ver);
+
+        // Make sure it processed ok
+        assert!(res.is_ok());
+
+        let (package_ver, dirty) = res.unwrap();
+
+        // Confirm it's dirty
+        assert!(dirty);
+
+        // confirm the version is correct
+        assert_eq!(
+            package_ver,
+            pyrinas_shared::OTAPackageVersion {
+                major: 0,
+                minor: 2,
+                patch: 1,
+                commit: 19,
+                hash: [
+                    'g' as u8, '0' as u8, '9' as u8, 'd' as u8, 'b' as u8, '6' as u8, 'e' as u8,
+                    'f' as u8
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn get_ota_package_version_success_clean() {
+        // Log setup
+        setup();
+
+        let ver = "0.2.1-19-g09db6ef";
+
+        let res = get_ota_package_version(ver);
+
+        // Make sure it processed ok
+        assert!(res.is_ok());
+
+        let (package_ver, dirty) = res.unwrap();
+
+        // Confirm it's dirty
+        assert!(!dirty);
+
+        // confirm the version is correct
+        assert_eq!(
+            package_ver,
+            pyrinas_shared::OTAPackageVersion {
+                major: 0,
+                minor: 2,
+                patch: 1,
+                commit: 19,
+                hash: [
+                    'g' as u8, '0' as u8, '9' as u8, 'd' as u8, 'b' as u8, '6' as u8, 'e' as u8,
+                    'f' as u8
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn get_ota_package_version_failure_dirty() {
+        // Log setup
+        setup();
+
+        let ver = "0.2.1-g09db6ef-dirty";
+
+        let res = get_ota_package_version(ver);
+
+        // Make sure it processed ok
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn get_git_describe_success() {
+        // Log setup
+        setup();
+
+        let res = get_git_describe();
+
+        // Make sure it processed ok
+        assert!(res.is_ok());
+    }
 }

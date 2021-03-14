@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-server"
-version = "0.2.3"
+version = "0.2.4"
 license = "Apache-2.0"
 description = "IoT Server with built-in OTA support and data logging capabilities."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"

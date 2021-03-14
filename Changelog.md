@@ -2,17 +2,21 @@
 
 All notable changes to this project will be documented in this file. This file adheres to the format of [keep a changelog.](https://keepachangelog.com/en/1.0.0/)
 
-## [Unreleased]
+## [0.2.4] - 3/13/2021
 
 ### Added
 
 * Add simple client example for local use
 * Added config.minimal.toml for local testing 
 * Added more details in Architecture.md
+* ability to parse git describe version output
+* added tests to support this new functionality 
 
 ### Changed
 
 * Flushed out how to use the example code with step-by-step beginning-to-end instructions. 
+* changed named of add_ota_from_manifest to add_ota
+* changed how add_ota fetches directly from Zephyr repo
 
 ## [0.2.3] - 3/10/2021
 

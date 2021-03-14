@@ -105,8 +105,9 @@ Here's what's on my plate and what's to come:
     - [ ] Example of full workng setup (and the steps to complete it)
   - [ ] CLI 
   - [ ] Zephyr side as well
-- [ ] Uploading an OTA package directly from Zephyr based repository
- - [ ] Clean build checks
+- [x] Uploading an OTA package directly from Zephyr based repository
+ - [x] Clean build checks
+- [ ] Removing update remotely
 - [ ] Implement more tests around:
  - [ ] Broker and optional broker capabilties 
  - [ ] Better coverage in OTA

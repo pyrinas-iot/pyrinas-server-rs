@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
 // Struct that gets serialized for OTA support
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct OTAPackageVersion {
     pub major: u8,
     pub minor: u8,

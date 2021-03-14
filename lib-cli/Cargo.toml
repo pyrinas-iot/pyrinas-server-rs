@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-cli"
-version = "0.2.3"
+version = "0.2.4"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -26,3 +26,5 @@ anyhow = "1.0.38" # Used for returning "generic" errors
 home = "0.5.3" # Get home directory 
 toml = "0.5.8" # Serializing/deserializing configuration
 tungstenite = "0.13.0" # Websocket client
+git2 = "0.13.17" # Git describe for getting version
+semver = "0.11" # Parsing version string
