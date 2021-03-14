@@ -1,0 +1,33 @@
+[mqtt]
+name = "test-server"
+topics = ["+/app/pub/#"]
+
+[mqtt.rumqtt]
+id = 0
+
+[mqtt.rumqtt.console]
+port = 3031
+
+[mqtt.rumqtt.router]
+id = 0
+dir = "/tmp/rumqttd"
+max_segment_size = 10240
+max_segment_count = 10
+max_connections = 10001
+
+[mqtt.rumqtt.servers.1]
+port = 1883
+next_connection_delay_ms = 10
+# Tls connections. ca_path enables client authentication
+[mqtt.rumqtt.servers.1.connections]
+connection_timeout_ms = 65000
+max_client_id_len = 256
+throttle_delay_ms = 0
+max_payload_size = 5120
+max_inflight_count = 100
+max_inflight_size = 1024
+
+[ota]
+url = "localhost"
+db_path = "./sled.db"
+http_port = 3030

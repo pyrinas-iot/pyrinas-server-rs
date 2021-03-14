@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. This file adheres to the format of [keep a changelog.](https://keepachangelog.com/en/1.0.0/)
 
+## [Unreleased]
+
+### Added
+
+* Add simple client example for local use
+* Added config.minimal.toml for local testing 
+* Added more details in Architecture.md
+
+### Changed
+
+* Flushed out how to use the example code with step-by-step beginning-to-end instructions. 
+
 ## [0.2.3] - 3/10/2021
 
 ### Added

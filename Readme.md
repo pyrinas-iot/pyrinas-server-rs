@@ -32,6 +32,27 @@ While you can run the example server on it's own, this library ultimately allows
 * A one-size fit all implementation for all IoT Devices
 * Pre-configurable server with all the features and protocols (not yet at least!)
 
+## Building
+
+You'll want to clone this repository onto your server or onto a build server with the same architecture/OS.
+
+```
+git clone https://github.com/pyrinas-iot/pyrinas-server-rs.git
+```
+
+The server is not yet in a Crate due to some un-published dependencies. Hopfully those will get taken care of in the future..
+
+You'll need the latest version of `rust`. You can use [`rustup`](https://rustup.rs) to download and install.
+
+```
+> cargo build --package pyrinas-server --release
+> cargo build --package pyrinas-cli --release
+```
+
+The server can be cross compiled using other platforms. Pyrinas is mostly used on and is compiled fairly regularly on FreeBSD. It does have some dependencies on OpenSSL/Libc so you'll need to configure these for your intended system of use.
+
+This will build the example server and cli. They'll be available in the `target/release/` folder. 
+
 ## Running the example server & CLI
 
 While this is more of a library than an executable, you can compile and run the included examples to get an idea of how things work. For more info check out [Using the Example](docs/using-the-example.md) for a step-by-step guide.
@@ -57,7 +78,7 @@ While `cross` is a handy tool, it takes almost 3 times as long to build a FreeBS
 
 Pyrinas uses TOML for it's configuration. There is an example TOML file included in this repository. (`config.example.toml`)
 
-For more details on running the included example. Check out [Configuring Pyrinas Server](docs/configuring-server.md).
+For more details on running the included example.
 
 ## Configuring the CLI
 

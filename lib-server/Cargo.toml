@@ -18,6 +18,10 @@ runtime_async_std = ["async-std", "async-macros"]
 name = "pyrinas-server"
 path = "src/bin/example/server.rs"
 
+[[bin]]
+name = "pyrinas-client"
+path = "src/bin/example/client.rs"
+
 [dependencies]
 clap = "3.0.0-beta.2" # CLI Library
 env_logger = "0.8" # logging message control using env variable
@@ -36,6 +40,8 @@ futures = "0.3.13" # Need to split WS
 toml = "0.5.8" # for config purposes
 chrono = "0.4" # for time
 
+# Example client bits
+rumqttc = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option" } # Mqtt client bits
 
 # Codec
 pyrinas-codec-example = { version = "0.1", path = "../lib-codec-example/" }
