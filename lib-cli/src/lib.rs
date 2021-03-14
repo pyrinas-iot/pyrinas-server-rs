@@ -65,7 +65,7 @@ pub struct ConfigCmd {
 #[clap(version = crate_version!())]
 pub enum ConfigSubCommand {
     Show(Show),
-    Install(Config),
+    Init(Config),
 }
 
 /// Show current configuration
