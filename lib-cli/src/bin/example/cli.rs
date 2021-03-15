@@ -1,6 +1,6 @@
 use clap::{crate_version, Clap};
 use pyrinas_cli::ota;
-use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
+use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
 // use url::Url;
 
 /// This doc string acts as a help message when the user runs '--help'
@@ -31,8 +31,8 @@ fn main() {
 
     // Process command.
     match opts.subcmd {
-        SubCommand::Ota(c) => match c {
-            OtaCmd::Add(s) => {
+        SubCommand::Ota(c) => match c.subcmd {
+            OtaSubCommand::Add(s) => {
                 // Check if config is valid
                 let config = match config {
                     Ok(c) => c,
@@ -61,7 +61,7 @@ fn main() {
 
                 println!("OTA image successfully uploaded!");
             }
-            OtaCmd::Remove(_r) => {
+            OtaSubCommand::Remove(_r) => {
                 // Check if config is valid
                 let config = match config {
                     Ok(c) => c,
@@ -101,7 +101,7 @@ fn main() {
 
                     println!("{:?}", config);
                 }
-                ConfigSubCommand::Install(c) => {
+                ConfigSubCommand::Init(c) => {
                     // Set the config from init struct
                     if let Err(e) = pyrinas_cli::set_config(&c) {
                         eprintln!("Unable to set config. Err: {}", e);

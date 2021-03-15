@@ -15,7 +15,14 @@ use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
 /// Various commands related to the OTA process
 #[derive(Clap, Debug)]
 #[clap(version = crate_version!())]
-pub enum OtaCmd {
+pub struct OtaCmd {
+    #[clap(subcommand)]
+    pub subcmd: OtaSubCommand,
+}
+
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub enum OtaSubCommand {
     /// Add OTA package
     Add(OtaAdd),
     /// Remove OTA package
