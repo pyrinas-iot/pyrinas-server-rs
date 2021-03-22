@@ -153,12 +153,8 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
             Event::ApplicationResponse(data) => {
                 debug!("Event::ApplicationResponse");
 
-                // Generate topic (debug)
-                #[cfg(debug_assertions)]
-                let sub_topic = format!("d/{}/app/sub/{}", data.uid, data.target);
-
                 // Generate topic
-                #[cfg(not(debug_assertions))]
+                // TODO: make these configurable
                 let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
 
                 // Publish to the UID in question
@@ -166,7 +162,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 if let Err(e) = tx.publish(&sub_topic, false, data.msg).await {
                     error!("Unable to publish to {}. Error: {}", sub_topic, e);
                 } else {
-                    debug!("Published..");
+                    debug!("Published to {}", sub_topic);
                 }
             }
             Event::OtaResponse(update) => {
@@ -175,12 +171,8 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 // Serialize this buddy
                 let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
 
-                // Generate topic (debug)
-                #[cfg(debug_assertions)]
-                let sub_topic = format!("d/{}/ota/sub", update.uid);
-
                 // Generate topic
-                #[cfg(not(debug_assertions))]
+                // TODO: make these configurable
                 let sub_topic = format!("{}/ota/sub", update.uid);
 
                 debug!("Publishing message to {}", &sub_topic);
@@ -189,7 +181,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 if let Err(e) = tx.publish(&sub_topic, false, res).await {
                     error!("Unable to publish to {}. Error: {}", sub_topic, e);
                 } else {
-                    debug!("Published..");
+                    debug!("Published to {}", sub_topic);
                 }
             }
             _ => (),
