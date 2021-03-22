@@ -1,0 +1,22 @@
+[package]
+name = "pyrinas-server-example"
+version = "0.1.0"
+authors = ["Jared Wolff <hello@jaredwolff.com>"]
+edition = "2018"
+
+[[bin]]
+name = "pyrinas-server"
+path = "src/bin/server/server.rs"
+
+[dependencies]
+pyrinas-codec-example = { version = "0.1", path = "../../lib-codec-example/" }
+pyrinas-server = { path = "../../lib-server" }
+
+flume = "0.10.2" # Channels
+clap = "3.0.0-beta.2" # CLI Library
+env_logger = "0.8" # logging message control using env variable
+tokio = { version = "1.0" } # async runtime
+log = "0.4" # logging messages
+
+serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
+serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze

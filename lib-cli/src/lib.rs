@@ -125,6 +125,26 @@ pub fn get_git_describe() -> anyhow::Result<String> {
     Ok(des)
 }
 
+// pub fn get_git_describe() -> anyhow::Result<String> {
+//     // Expected output 0.2.1-19-g09db6ef-dirty
+
+//     // Get git describe output
+//     let out = Command::new("git")
+//         .args(&["describe", "--dirty", "--always", "--long"])
+//         .output()?;
+
+//     let err = std::str::from_utf8(&out.stderr)?;
+//     let out = std::str::from_utf8(&out.stdout)?;
+
+//     // Return error if not blank
+//     if err != "" {
+//         return Err(anyhow!("Git error. Err: {}", err));
+//     }
+
+//     // Convert it to String
+//     Ok(out.to_string())
+// }
+
 pub fn get_ota_package_version(
     ver: &str,
 ) -> anyhow::Result<(pyrinas_shared::OTAPackageVersion, bool)> {
@@ -334,5 +354,7 @@ mod tests {
 
         // Make sure it processed ok
         assert!(res.is_ok());
+
+        log::info!("res: {}", res.unwrap());
     }
 }

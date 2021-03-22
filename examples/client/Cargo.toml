@@ -1,0 +1,20 @@
+[package]
+name = "pyrinas-client-example"
+version = "0.1.0"
+authors = ["Jared Wolff <hello@jaredwolff.com>"]
+edition = "2018"
+
+[[bin]]
+name = "pyrinas-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+pyrinas-codec-example = { version = "0.1", path = "../../lib-codec-example/" }
+
+rumqttc = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option" } # Mqtt client bits
+
+clap = "3.0.0-beta.2" # CLI Library
+tokio = { version = "1.0" } # async runtime
+
+serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
+serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
