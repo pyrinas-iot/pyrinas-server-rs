@@ -57,6 +57,28 @@ pub struct ManagementData {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PyrinasEventName {
+    pub size: u32,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PyrinasEventData {
+    pub size: u32,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PyrinasEvent {
+    pub name: PyrinasEventName,
+    pub data: PyrinasEventData,
+    pub peripheral_addr: Vec<u8>,
+    pub central_addr: Vec<u8>,
+    pub peripheral_rssi: i8,
+    pub central_rssi: i8,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ApplicationData {
     pub uid: String,
     pub target: String,

@@ -201,7 +201,7 @@ pub fn get_socket(config: &Config) -> anyhow::Result<WebSocket<AutoStream>> {
     Ok(socket)
 }
 
-/// Fetcht he configuration from the provided folder path
+/// Fetch the configuration from the provided folder path
 pub fn get_config() -> anyhow::Result<Config> {
     // Get config path
     let mut path = get_config_path()?;
