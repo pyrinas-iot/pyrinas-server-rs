@@ -6,4 +6,5 @@ members = [
     "lib-codec-example",
     "examples/server",
     "examples/client",
+    "examples/tracker",
 ]

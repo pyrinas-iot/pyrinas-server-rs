@@ -10,6 +10,7 @@ config.toml
 *.sock
 *.crt
 *.key
+
 # Ignore these folders
 _images
 _out
