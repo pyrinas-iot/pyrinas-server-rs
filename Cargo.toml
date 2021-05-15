@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "certs",
     "lib-cli",
     "lib-server",
     "lib-shared",
