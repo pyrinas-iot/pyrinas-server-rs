@@ -1,3 +1,5 @@
+pub mod certs;
+pub mod device;
 pub mod ota;
 
 use anyhow::anyhow;
@@ -18,6 +20,25 @@ use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
 pub struct OtaCmd {
     #[clap(subcommand)]
     pub subcmd: OtaSubCommand,
+}
+
+/// Commands related to certs
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub struct CertCmd {
+    #[clap(subcommand)]
+    pub subcmd: CertSubcommand,
+}
+
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub enum CertSubcommand {
+    /// Generate CA cert
+    Ca,
+    /// Generate server cert
+    Server,
+    /// Generate device cert
+    Device { id: String },
 }
 
 #[derive(Clap, Debug)]
@@ -48,9 +69,18 @@ pub struct OtaRemove {
     pub uid: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct CertConfig {
+    /// Domain certs are being generated for
+    pub domain: String,
+    /// Organization entry for cert gen
+    pub organization: String,
+    /// Country entry for cert gen
+    pub country: String,
+}
+
 /// Config that can be installed locally
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
     /// URL of the Pyrinas server to connect to.
     /// For example: pyrinas-admin.yourdomain.com
@@ -58,6 +88,8 @@ pub struct Config {
     /// Authentication key. This is the same key set in
     /// the Pyrinas config.toml
     pub authkey: String,
+    /// Server cert configuration
+    pub cert: CertConfig,
 }
 
 /// Configuration related commands
@@ -72,7 +104,7 @@ pub struct ConfigCmd {
 #[clap(version = crate_version!())]
 pub enum ConfigSubCommand {
     Show(Show),
-    Init(Config),
+    Init,
 }
 
 /// Show current configuration

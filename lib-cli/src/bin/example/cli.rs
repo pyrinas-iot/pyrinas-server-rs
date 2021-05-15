@@ -1,5 +1,6 @@
+use anyhow::anyhow;
 use clap::{crate_version, Clap};
-use pyrinas_cli::ota;
+use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
 // use url::Url;
 
@@ -17,9 +18,10 @@ struct Opts {
 enum SubCommand {
     Ota(OtaCmd),
     Config(ConfigCmd),
+    Cert(CertCmd),
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // Opts from CLI
     let opts: Opts = Opts::parse();
 
@@ -37,10 +39,9 @@ fn main() {
                 let config = match config {
                     Ok(c) => c,
                     Err(_e) => {
-                        eprintln!(
+                        return Err(anyhow!(
                             "Unable to get config. Run \"init\" command before you continue."
-                        );
-                        return;
+                        ));
                     }
                 };
 
@@ -48,15 +49,14 @@ fn main() {
                 let mut socket = match pyrinas_cli::get_socket(&config) {
                     Ok(s) => s,
                     Err(e) => {
-                        eprintln!("{}", e);
-                        return;
+                        return Err(anyhow!("Unable to get socket to Pyrinas! Err: {}", e));
                     }
                 };
 
                 // Then process
                 if let Err(e) = crate::ota::add_ota(&mut socket, &s) {
                     eprintln!("Err: {}", e);
-                    return;
+                    return Err(anyhow!("Unable to add OTA!"));
                 };
 
                 println!("OTA image successfully uploaded!");
@@ -66,10 +66,9 @@ fn main() {
                 let config = match config {
                     Ok(c) => c,
                     Err(_e) => {
-                        eprintln!(
+                        return Err(anyhow!(
                             "Unable to get config. Run \"init\" command before you continue."
-                        );
-                        return;
+                        ));
                     }
                 };
 
@@ -78,13 +77,37 @@ fn main() {
                     Ok(s) => s,
                     Err(e) => {
                         eprintln!("{}", e);
-                        return;
+                        return Err(anyhow!("Unable to get socket to Pyrinas!"));
                     }
                 };
 
                 // TODO: run the remove function
             }
         },
+        SubCommand::Cert(c) => {
+            // Check if config is valid
+            let config = match config {
+                Ok(c) => c,
+                Err(_e) => {
+                    return Err(anyhow!(
+                        "Unable to get config. Run \"init\" command before you continue."
+                    ))
+                }
+            };
+
+            // Depending on the input, create CA, server or client cert
+            match c.subcmd {
+                pyrinas_cli::CertSubcommand::Ca => {
+                    certs::generate_ca_cert(&config.cert)?;
+                }
+                pyrinas_cli::CertSubcommand::Server => {
+                    certs::generate_server_cert(&config.cert)?;
+                }
+                pyrinas_cli::CertSubcommand::Device { id } => {
+                    certs::generate_device_cert(&config.cert, &id)?;
+                }
+            }
+        }
         SubCommand::Config(c) => {
             match c.subcmd {
                 ConfigSubCommand::Show(_) => {
@@ -92,20 +115,23 @@ fn main() {
                     let config = match config {
                         Ok(c) => c,
                         Err(_e) => {
-                            eprintln!(
+                            return Err(anyhow!(
                                 "Unable to get config. Run \"init\" command before you continue."
-                            );
-                            return;
+                            ));
                         }
                     };
 
                     println!("{:?}", config);
                 }
-                ConfigSubCommand::Init(c) => {
+                ConfigSubCommand::Init => {
+                    // Default config (blank)
+                    let c = Default::default();
+
+                    // TODO: migrate config on update..
+
                     // Set the config from init struct
                     if let Err(e) = pyrinas_cli::set_config(&c) {
-                        eprintln!("Unable to set config. Err: {}", e);
-                        return;
+                        return Err(anyhow!("Unable to set config. Err: {}", e));
                     };
 
                     println!("Config successfully added!");
@@ -113,4 +139,6 @@ fn main() {
             }
         }
     }
+
+    Ok(())
 }
