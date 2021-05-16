@@ -29,22 +29,15 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     // Get config
-    let config = pyrinas_cli::get_config();
+    let config = match pyrinas_cli::get_config() {
+        Ok(c) => c,
+        Err(e) => return Err(anyhow!("Unable to get config. Error: {}", e)),
+    };
 
     // Process command.
     match opts.subcmd {
         SubCommand::Ota(c) => match c.subcmd {
             OtaSubCommand::Add(s) => {
-                // Check if config is valid
-                let config = match config {
-                    Ok(c) => c,
-                    Err(_e) => {
-                        return Err(anyhow!(
-                            "Unable to get config. Run \"init\" command before you continue."
-                        ));
-                    }
-                };
-
                 // Get socket
                 let mut socket = match pyrinas_cli::get_socket(&config) {
                     Ok(s) => s,
@@ -62,16 +55,6 @@ fn main() -> anyhow::Result<()> {
                 println!("OTA image successfully uploaded!");
             }
             OtaSubCommand::Remove(_r) => {
-                // Check if config is valid
-                let config = match config {
-                    Ok(c) => c,
-                    Err(_e) => {
-                        return Err(anyhow!(
-                            "Unable to get config. Run \"init\" command before you continue."
-                        ));
-                    }
-                };
-
                 // Get socket
                 let mut _socket = match pyrinas_cli::get_socket(&config) {
                     Ok(s) => s,
@@ -85,16 +68,6 @@ fn main() -> anyhow::Result<()> {
             }
         },
         SubCommand::Cert(c) => {
-            // Check if config is valid
-            let config = match config {
-                Ok(c) => c,
-                Err(_e) => {
-                    return Err(anyhow!(
-                        "Unable to get config. Run \"init\" command before you continue."
-                    ))
-                }
-            };
-
             // Depending on the input, create CA, server or client cert
             match c.subcmd {
                 pyrinas_cli::CertSubcommand::Ca => {
@@ -111,16 +84,6 @@ fn main() -> anyhow::Result<()> {
         SubCommand::Config(c) => {
             match c.subcmd {
                 ConfigSubCommand::Show(_) => {
-                    // Check if config is valid
-                    let config = match config {
-                        Ok(c) => c,
-                        Err(_e) => {
-                            return Err(anyhow!(
-                                "Unable to get config. Run \"init\" command before you continue."
-                            ));
-                        }
-                    };
-
                     println!("{:?}", config);
                 }
                 ConfigSubCommand::Init => {

@@ -77,6 +77,8 @@ pub struct CertConfig {
     pub organization: String,
     /// Country entry for cert gen
     pub country: String,
+    /// PFX password
+    pub pfx_pass: String,
 }
 
 /// Config that can be installed locally
@@ -269,7 +271,7 @@ pub fn set_config(init: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_config_path() -> anyhow::Result<PathBuf> {
+pub fn get_config_path() -> anyhow::Result<PathBuf> {
     // Get the config file from standard location
     let mut config_path = match home::home_dir() {
         Some(path) => path,

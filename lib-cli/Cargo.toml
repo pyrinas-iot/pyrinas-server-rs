@@ -29,3 +29,4 @@ tungstenite = "0.13.0" # Websocket client
 git2 = "0.13.17" # Git describe for getting version
 semver = "0.11" # Parsing version string
 rcgen = { version = "0.8", features = ["x509-parser", "pem"] } # Used to generate certs
+p12 = "0.2" # Used for creating .pfx file
