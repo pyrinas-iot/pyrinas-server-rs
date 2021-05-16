@@ -1,13 +1,48 @@
-use anyhow::anyhow;
-use chrono::{offset::Utc, Datelike};
+use chrono::{Datelike, Utc};
 use p12::PFX;
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa,
-    SanType,
+    KeyPair, SanType,
 };
-use std::{convert::TryInto, fs};
+use std::{convert::TryFrom, fs, io};
+use thiserror::Error;
 
 use crate::CertConfig;
+
+#[derive(Debug, Error)]
+pub enum CertsError {
+    #[error("filesystem error: {source}")]
+    FileError {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("rcgen error: {source}")]
+    CertGen {
+        #[from]
+        source: rcgen::RcgenError,
+    },
+
+    #[error("pfx gen error")]
+    PfxGen,
+
+    #[error("cert for {name} already exists!")]
+    AlreadyExists { name: String },
+
+    /// Serde json error
+    #[error("serde json error: {source}")]
+    JsonError {
+        #[from]
+        source: serde_json::Error,
+    },
+
+    /// Error from CLI portion of code
+    #[error("cli error: {source}")]
+    CliError {
+        #[from]
+        source: crate::CliError,
+    },
+}
 
 fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     // CA cert params
@@ -38,7 +73,7 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     params
 }
 
-pub fn generate_ca_cert(config: &crate::CertConfig) -> anyhow::Result<()> {
+pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Get the path
@@ -48,7 +83,9 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> anyhow::Result<()> {
 
     // Check if CA exits
     if std::path::Path::new(&ca_pem_path).exists() {
-        return Err(anyhow!("Server cert for {} already exists!", config.domain));
+        return Err(CertsError::AlreadyExists {
+            name: "ca".to_string(),
+        });
     }
     // CA cert params
     let mut params: CertificateParams = get_default_params(config);
@@ -83,7 +120,7 @@ fn write_device_json(
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
-) -> anyhow::Result<()> {
+) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Serialize output
@@ -116,12 +153,12 @@ fn write_device_json(
     Ok(())
 }
 
-fn write_cert(
+pub fn write_cert(
     config: &CertConfig,
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
-) -> anyhow::Result<()> {
+) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Serialize output
@@ -159,7 +196,7 @@ fn write_pfx(
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
-) -> anyhow::Result<()> {
+) -> Result<(), CertsError> {
     // Config path
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
@@ -168,6 +205,13 @@ fn write_pfx(
         "{}/certs/{}/{}/{}.pfx",
         config_path, config.domain, name, name
     );
+
+    // Check if it exists
+    if std::path::Path::new(&ca_pfx_path).exists() {
+        return Err(CertsError::AlreadyExists {
+            name: name.to_string(),
+        });
+    }
 
     let cert_der = cert.serialize_der_with_signer(&ca_cert)?;
     let key_der = cert.serialize_private_key_der();
@@ -180,7 +224,7 @@ fn write_pfx(
         &config.pfx_pass,
         &name,
     )
-    .ok_or(anyhow!("Unable to generate .pfx!"))?
+    .ok_or(CertsError::PfxGen)?
     .to_der()
     .to_vec();
 
@@ -190,7 +234,7 @@ fn write_pfx(
     Ok(())
 }
 
-pub fn get_ca_cert(config: &crate::CertConfig) -> anyhow::Result<Certificate> {
+pub fn get_ca_cert(config: &crate::CertConfig) -> Result<Certificate, CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Load CA
@@ -217,7 +261,7 @@ pub fn get_ca_cert(config: &crate::CertConfig) -> anyhow::Result<Certificate> {
     Ok(Certificate::from_params(ca_cert_params)?)
 }
 
-pub fn generate_server_cert(config: &crate::CertConfig) -> anyhow::Result<()> {
+pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
     let name = "server".to_string();
 
@@ -228,7 +272,9 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> anyhow::Result<()> {
 
     // Check if it exists
     if std::path::Path::new(&server_cert_path).exists() {
-        return Err(anyhow!("Server cert for {} already exists!", config.domain));
+        return Err(CertsError::AlreadyExists {
+            name: name.to_string(),
+        });
     }
 
     // Get CA Cert
@@ -255,7 +301,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> anyhow::Result<()> {
+pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     let device_cert_path = format!(
@@ -265,11 +311,9 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> anyhow
 
     // Check if it exists
     if std::path::Path::new(&device_cert_path).exists() {
-        return Err(anyhow!(
-            "Device cert for {} on {} already exists!",
-            name,
-            config.domain
-        ));
+        return Err(CertsError::AlreadyExists {
+            name: name.to_string(),
+        });
     }
 
     // Get CA Cert

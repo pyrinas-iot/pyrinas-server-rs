@@ -23,6 +23,7 @@ serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing
 serde_json = "^1.0" # For serialization of json
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
 anyhow = "1.0" # Used for returning "generic" errors
+thiserror = "1.0" # Error handling
 home = "0.5.3" # Get home directory 
 toml = "0.5.8" # Serializing/deserializing configuration
 tungstenite = "0.13.0" # Websocket client

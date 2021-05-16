@@ -2,7 +2,6 @@ use anyhow::anyhow;
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
-// use url::Url;
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
