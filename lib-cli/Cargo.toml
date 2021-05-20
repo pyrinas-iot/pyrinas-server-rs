@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-cli"
-version = "0.2.4"
+version = "0.2.5"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -15,7 +15,7 @@ path = "src/bin/example/cli.rs"
 
 [dependencies]
 pem = "0.8"
-rcgen = { git = "https://github.com/jaredwolff/rcgen.git", branch = "adding-keyusage", features = ["x509-parser", "pem"] } # Used to generate certs
+rcgen = { git = "https://github.com/est31/rcgen.git", branch = "master", features = ["x509-parser", "pem"] } # Used to generate certs
 chrono = "0.4" # Tracking time
 clap = "3.0.0-beta.2" # CLI Library (Needed?)
 env_logger = "0.8" # logging message control using env variable
