@@ -1,23 +1,24 @@
 use chrono::{Datelike, Utc};
 use p12::PFX;
+use pem::Pem;
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa,
-    KeyPair, SanType,
+    KeyUsagePurpose, SanType,
 };
-use std::{convert::TryFrom, fs, io};
+use std::{convert::TryInto, fs, io};
 use thiserror::Error;
 
 use crate::CertConfig;
 
 #[derive(Debug, Error)]
 pub enum CertsError {
-    #[error("filesystem error: {source}")]
+    #[error("{source}")]
     FileError {
         #[from]
         source: io::Error,
     },
 
-    #[error("rcgen error: {source}")]
+    #[error("{source}")]
     CertGen {
         #[from]
         source: rcgen::RcgenError,
@@ -30,14 +31,14 @@ pub enum CertsError {
     AlreadyExists { name: String },
 
     /// Serde json error
-    #[error("serde json error: {source}")]
+    #[error("{source}")]
     JsonError {
         #[from]
         source: serde_json::Error,
     },
 
     /// Error from CLI portion of code
-    #[error("cli error: {source}")]
+    #[error("{source}")]
     CliError {
         #[from]
         source: crate::CliError,
@@ -47,6 +48,8 @@ pub enum CertsError {
 fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     // CA cert params
     let mut params: CertificateParams = Default::default();
+
+    params.is_ca = IsCa::NoCa;
 
     params.not_before = Utc::now();
     params.not_after = params
@@ -68,8 +71,6 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
 
     params.use_authority_key_identifier_extension = true;
 
-    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
-
     params
 }
 
@@ -77,12 +78,11 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Get the path
-    let ca_pem_path = format!("{}/certs/{}/ca/ca.pem", config_path, config.domain);
     let ca_der_path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
     let ca_private_der_path = format!("{}/certs/{}/ca/ca.key.der", config_path, config.domain);
 
     // Check if CA exits
-    if std::path::Path::new(&ca_pem_path).exists() {
+    if std::path::Path::new(&ca_der_path).exists() {
         return Err(CertsError::AlreadyExists {
             name: "ca".to_string(),
         });
@@ -91,10 +91,13 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
     let mut params: CertificateParams = get_default_params(config);
 
     // This can sign things!
-    params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
 
-    // Server mode only?
-    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::Any];
+    // Set the key usage
+    params.key_usages = vec![
+        KeyUsagePurpose::CrlSign,
+        KeyUsagePurpose::KeyCertSign,
+    ];
 
     // Set this to 10 years instead of default 4
     params.not_after = params
@@ -107,10 +110,11 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
 
     // Create ca
     let ca_cert = Certificate::from_params(params).unwrap();
-    println!("{}", ca_cert.serialize_pem().unwrap());
-    fs::write(ca_pem_path, &ca_cert.serialize_pem().unwrap().as_bytes())?;
+
     fs::write(ca_der_path, &ca_cert.serialize_der().unwrap())?;
     fs::write(ca_private_der_path, &ca_cert.serialize_private_key_der())?;
+
+    println!("Exported CA to {}", config_path);
 
     Ok(())
 }
@@ -120,19 +124,27 @@ fn write_device_json(
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
+    ca_der: &Vec<u8>,
 ) -> Result<(), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Serialize output
     let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
     let key_pem = cert.serialize_private_key_pem();
-    let ca_cert = ca_cert.serialize_pem().unwrap();
 
-    // TODO: export as JSON format as well.
+    // Get CA cert to pem but don't keep re-signing it..
+    let p = Pem {
+        tag: "CERTIFICATE".to_string(),
+        contents: ca_der.to_vec(),
+    };
+
+    let ca_pem = pem::encode(&p);
+
+    // Export as JSON
     let json_device_cert = crate::device::DeviceCert {
         private_key: key_pem,
         client_cert: cert_pem,
-        ca_cert: ca_cert,
+        ca_cert: ca_pem,
         client_id: name.to_string(),
     };
 
@@ -153,7 +165,7 @@ fn write_device_json(
     Ok(())
 }
 
-pub fn write_cert(
+pub fn write_keypair_pem(
     config: &CertConfig,
     name: &String,
     cert: &Certificate,
@@ -164,10 +176,6 @@ pub fn write_cert(
     // Serialize output
     let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
     let key_pem = cert.serialize_private_key_pem();
-
-    // Display certs
-    println!("{}", cert_pem);
-    println!("{}", key_pem);
 
     // Create directory if not already
     std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
@@ -196,6 +204,7 @@ fn write_pfx(
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
+    ca_der: &Vec<u8>,
 ) -> Result<(), CertsError> {
     // Config path
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
@@ -213,20 +222,19 @@ fn write_pfx(
         });
     }
 
+    // Create directory if not already
+    std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
+
     let cert_der = cert.serialize_der_with_signer(&ca_cert)?;
     let key_der = cert.serialize_private_key_der();
 
+    // Serialize ca_der as bytes without re-signing..
+
     // Generate pfx file!
-    let ca_pfx = PFX::new(
-        &cert_der,
-        &key_der,
-        Some(&ca_cert.serialize_der()?),
-        &config.pfx_pass,
-        &name,
-    )
-    .ok_or(CertsError::PfxGen)?
-    .to_der()
-    .to_vec();
+    let ca_pfx = PFX::new(&cert_der, &key_der, Some(&ca_der), &config.pfx_pass, &name)
+        .ok_or(CertsError::PfxGen)?
+        .to_der()
+        .to_vec();
 
     // Write it
     fs::write(ca_pfx_path, ca_pfx)?;
@@ -234,7 +242,7 @@ fn write_pfx(
     Ok(())
 }
 
-pub fn get_ca_cert(config: &crate::CertConfig) -> Result<Certificate, CertsError> {
+pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>), CertsError> {
     let config_path = crate::get_config_path()?.to_string_lossy().to_string();
 
     // Load CA
@@ -254,11 +262,10 @@ pub fn get_ca_cert(config: &crate::CertConfig) -> Result<Certificate, CertsError
     let ca_cert_params = CertificateParams::from_ca_cert_der(
         ca_cert_der.as_slice(),
         ca_cert_key_der.as_slice().try_into()?,
-    )
-    .expect("certificate params");
+    )?;
 
     // Return the cert or error
-    Ok(Certificate::from_params(ca_cert_params)?)
+    Ok((Certificate::from_params(ca_cert_params)?, ca_cert_der))
 }
 
 pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
@@ -266,7 +273,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
     let name = "server".to_string();
 
     let server_cert_path = format!(
-        "{}/certs/{}/{}/{}.pem",
+        "{}/certs/{}/{}/{}.pfx",
         config_path, config.domain, name, name
     );
 
@@ -278,12 +285,18 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
     }
 
     // Get CA Cert
-    let ca_cert = get_ca_cert(config)?;
+    let (ca_cert, ca_der) = get_ca_cert(config)?;
 
     // Cert params
     let mut params: CertificateParams = get_default_params(config);
 
-    // Server auth only
+    // Set the key usage
+    params.key_usages = vec![
+        KeyUsagePurpose::DigitalSignature,
+        KeyUsagePurpose::KeyEncipherment,
+    ];
+
+    // Set the ext key useage
     params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
 
     // Set the alt name
@@ -293,10 +306,12 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
     let cert = Certificate::from_params(params)?;
 
     // Write cert to file(s)
-    write_cert(&config, &name, &cert, &ca_cert)?;
+    // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
 
     // Write pfx
-    write_pfx(&config, &name, &cert, &ca_cert)?;
+    write_pfx(&config, &name, &cert, &ca_cert, &ca_der)?;
+
+    println!("Exported server .pfx to {}", config_path);
 
     Ok(())
 }
@@ -317,10 +332,18 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
     }
 
     // Get CA Cert
-    let ca_cert = get_ca_cert(config)?;
+    let (ca_cert, ca_der) = get_ca_cert(config)?;
 
     // Cert params
     let mut params: CertificateParams = get_default_params(config);
+
+    // Set the key usage
+    params.key_usages = vec![
+        KeyUsagePurpose::DigitalSignature,
+    ];
+
+    // Set the ext key useage
+    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
 
     // Set the alt name
     params.subject_alt_names = vec![SanType::Rfc822Name(format!(
@@ -333,10 +356,12 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
     let cert = Certificate::from_params(params)?;
 
     // Write all cert info to file(s)
-    write_cert(&config, &name, &cert, &ca_cert)?;
+    // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
 
     // Write nRF Connect Desktop compatable JSON for cert install
-    write_device_json(&config, &name, &cert, &ca_cert)?;
+    write_device_json(&config, &name, &cert, &ca_cert, &ca_der)?;
+
+    println!("Exported cert for {} to {}/{}", name, config_path, config.domain);
 
     Ok(())
 }
