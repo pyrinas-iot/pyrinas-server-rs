@@ -1,16 +1,74 @@
+pub mod certs;
+pub mod device;
 pub mod ota;
 
-use anyhow::anyhow;
 use clap::{crate_version, Clap};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, path::PathBuf};
+use std::{convert::TryInto, io, num, path::PathBuf};
 
 // Getting git repo information
 use git2::{DescribeFormatOptions, DescribeOptions, Repository};
 use semver::Version;
 
+// Error handling
+use thiserror::Error;
+
 // Websocket
-use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
+use tungstenite::{client::AutoStream, http, http::Request, protocol::WebSocket};
+
+#[derive(Debug, Error)]
+pub enum CliError {
+    #[error("filesystem error: {source}")]
+    FileError {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("git error: {source}")]
+    GitError {
+        #[from]
+        source: git2::Error,
+    },
+
+    #[error("git repo not found!")]
+    GitNotFound,
+
+    #[error("unable to convert hash")]
+    HashError,
+
+    #[error("toml error: {source}")]
+    TomlError {
+        #[from]
+        source: toml::de::Error,
+    },
+
+    #[error("unable to get home path")]
+    HomeError,
+
+    #[error("http error: {source}")]
+    HttpError {
+        #[from]
+        source: http::Error,
+    },
+
+    #[error("websocket handshake error {source}")]
+    WebsocketError {
+        #[from]
+        source: tungstenite::Error,
+    },
+
+    #[error("semver error: {source}")]
+    SemVerError {
+        #[from]
+        source: semver::SemVerError,
+    },
+
+    #[error("parse error: {source}")]
+    ParseError {
+        #[from]
+        source: num::ParseIntError,
+    },
+}
 
 /// Various commands related to the OTA process
 #[derive(Clap, Debug)]
@@ -18,6 +76,25 @@ use tungstenite::{client::AutoStream, http::Request, protocol::WebSocket};
 pub struct OtaCmd {
     #[clap(subcommand)]
     pub subcmd: OtaSubCommand,
+}
+
+/// Commands related to certs
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub struct CertCmd {
+    #[clap(subcommand)]
+    pub subcmd: CertSubcommand,
+}
+
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub enum CertSubcommand {
+    /// Generate CA cert
+    Ca,
+    /// Generate server cert
+    Server,
+    /// Generate device cert
+    Device { id: String },
 }
 
 #[derive(Clap, Debug)]
@@ -48,9 +125,20 @@ pub struct OtaRemove {
     pub uid: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct CertConfig {
+    /// Domain certs are being generated for
+    pub domain: String,
+    /// Organization entry for cert gen
+    pub organization: String,
+    /// Country entry for cert gen
+    pub country: String,
+    /// PFX password
+    pub pfx_pass: String,
+}
+
 /// Config that can be installed locally
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
     /// URL of the Pyrinas server to connect to.
     /// For example: pyrinas-admin.yourdomain.com
@@ -58,6 +146,8 @@ pub struct Config {
     /// Authentication key. This is the same key set in
     /// the Pyrinas config.toml
     pub authkey: String,
+    /// Server cert configuration
+    pub cert: CertConfig,
 }
 
 /// Configuration related commands
@@ -72,7 +162,7 @@ pub struct ConfigCmd {
 #[clap(version = crate_version!())]
 pub enum ConfigSubCommand {
     Show(Show),
-    Init(Config),
+    Init,
 }
 
 /// Show current configuration
@@ -88,7 +178,7 @@ pub struct OTAManifest {
     pub force: bool,
 }
 
-pub fn get_git_describe() -> anyhow::Result<String> {
+pub fn get_git_describe() -> Result<String, CliError> {
     let mut path = std::env::current_dir()?;
 
     let repo: Repository;
@@ -99,7 +189,7 @@ pub fn get_git_describe() -> anyhow::Result<String> {
             Ok(repo) => repo,
             Err(_e) => {
                 if !path.pop() {
-                    return Err(anyhow!("Could not find repo!"));
+                    return Err(CliError::GitNotFound);
                 }
 
                 continue;
@@ -125,7 +215,7 @@ pub fn get_git_describe() -> anyhow::Result<String> {
     Ok(des)
 }
 
-// pub fn get_git_describe() -> anyhow::Result<String> {
+// pub fn get_git_describe() -> Result<String, OtaError> {
 //     // Expected output 0.2.1-19-g09db6ef-dirty
 
 //     // Get git describe output
@@ -147,7 +237,7 @@ pub fn get_git_describe() -> anyhow::Result<String> {
 
 pub fn get_ota_package_version(
     ver: &str,
-) -> anyhow::Result<(pyrinas_shared::OTAPackageVersion, bool)> {
+) -> Result<(pyrinas_shared::OTAPackageVersion, bool), CliError> {
     // Parse the version
     let version = Version::parse(ver)?;
 
@@ -171,14 +261,14 @@ pub fn get_ota_package_version(
     ))
 }
 
-fn get_hash(v: Vec<u8>) -> anyhow::Result<[u8; 8]> {
+fn get_hash(v: Vec<u8>) -> Result<[u8; 8], CliError> {
     match v.try_into() {
         Ok(r) => Ok(r),
-        Err(_e) => Err(anyhow!("Unable to convert hash.")),
+        Err(_e) => Err(CliError::HashError),
     }
 }
 
-pub fn get_socket(config: &Config) -> anyhow::Result<WebSocket<AutoStream>> {
+pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
     // String of full URL
     let full_uri = format!("wss://{}/socket", config.url);
 
@@ -190,19 +280,14 @@ pub fn get_socket(config: &Config) -> anyhow::Result<WebSocket<AutoStream>> {
 
     // Connect to TCP based WS socket
     // TODO: confirm URL is parsed correctly into tungstenite
-    let (socket, _response) = match tungstenite::connect(req) {
-        Ok(r) => r,
-        Err(_e) => {
-            return Err(anyhow!("Unable to connect to Websocket @ {}", config.url));
-        }
-    };
+    let (socket, _response) = tungstenite::connect(req)?;
 
     // Return this guy
     Ok(socket)
 }
 
 /// Fetch the configuration from the provided folder path
-pub fn get_config() -> anyhow::Result<Config> {
+pub fn get_config() -> Result<Config, CliError> {
     // Get config path
     let mut path = get_config_path()?;
 
@@ -218,7 +303,7 @@ pub fn get_config() -> anyhow::Result<Config> {
 }
 
 /// Set config
-pub fn set_config(init: &Config) -> anyhow::Result<()> {
+pub fn set_config(init: &Config) -> Result<(), CliError> {
     // Get config path
     let mut path = get_config_path()?;
 
@@ -237,14 +322,9 @@ pub fn set_config(init: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_config_path() -> anyhow::Result<PathBuf> {
+pub fn get_config_path() -> Result<PathBuf, CliError> {
     // Get the config file from standard location
-    let mut config_path = match home::home_dir() {
-        Some(path) => path,
-        None => {
-            return Err(anyhow!("Impossible to get your home dir!"));
-        }
-    };
+    let mut config_path = home::home_dir().ok_or(CliError::HomeError)?;
 
     // Append config path to home directory
     config_path.push(".pyrinas");

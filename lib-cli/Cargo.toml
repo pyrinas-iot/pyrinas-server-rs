@@ -14,17 +14,21 @@ name = "pyrinas-cli"
 path = "src/bin/example/cli.rs"
 
 [dependencies]
+pem = "0.8"
+rcgen = { git = "https://github.com/jaredwolff/rcgen.git", branch = "adding-keyusage", features = ["x509-parser", "pem"] } # Used to generate certs
 chrono = "0.4" # Tracking time
 clap = "3.0.0-beta.2" # CLI Library (Needed?)
 env_logger = "0.8" # logging message control using env variable
 log = "0.4" # logging messages
 pyrinas-shared = { version = "0.2", path = "../lib-shared/" }
-serde = { version = "^1.0", features = ["derive"] } # Serializing/deserializing  
+serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing  
 serde_json = "^1.0" # For serialization of json
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
-anyhow = "1.0.38" # Used for returning "generic" errors
+anyhow = "1.0" # Used for returning "generic" errors
+thiserror = "1.0" # Error handling
 home = "0.5.3" # Get home directory 
 toml = "0.5.8" # Serializing/deserializing configuration
 tungstenite = "0.13.0" # Websocket client
 git2 = "0.13.17" # Git describe for getting version
 semver = "0.11" # Parsing version string
+p12 = "0.2" # Used for creating .pfx file
