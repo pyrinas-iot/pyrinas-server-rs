@@ -20,7 +20,7 @@ env_logger = "0.8" # logging message control using env variable
 influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
 log = "0.4" # logging messages
 pyrinas-shared = { version = "0.2", path = "../lib-shared/" } # Local shared for settings, etc 
-rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option", default-features = false, features = ["use-native-tls"] } # Mqtt core bits
+rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "native-tls-improvments", default-features = false, features = ["use-native-tls"] } # Mqtt core bits
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
 serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
 serde_json = "1.0" # Serializing/deserializing json

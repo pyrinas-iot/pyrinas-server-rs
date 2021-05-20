@@ -11,7 +11,7 @@ path = "src/bin/client.rs"
 [dependencies]
 pyrinas-codec-example = { version = "0.1", path = "../../lib-codec-example/" }
 
-rumqttc = { git = "https://github.com/jaredwolff/rumqtt", branch = "add-native-tls-option" } # Mqtt client bits
+rumqttc = { git = "https://github.com/jaredwolff/rumqtt", branch = "native-tls-improvments" } # Mqtt core bits
 
 clap = "3.0.0-beta.2" # CLI Library
 tokio = { version = "1.0" } # async runtime
