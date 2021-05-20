@@ -16,9 +16,6 @@ use pyrinas_shared::{OTAPackage, OtaRequestCmd, OtaUpdate};
 // warp
 use warp::{self, Filter};
 
-// Static image folder path
-const IMAGE_FOLDER_PATH: &str = "./_images";
-
 // Get the OTA package from database
 // TODO: make this consistent with other calls..
 fn get_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<OTAPackage> {
@@ -123,7 +120,9 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
                 // Save image to file before we muck with the OtaUpdate
                 match update.image {
                     Some(i) => {
-                        if let Err(e) = save_ota_firmware_image(&update.uid, &i).await {
+                        if let Err(e) =
+                            save_ota_firmware_image(&settings.image_path, &update.uid, &i).await
+                        {
                             log::error!("Unable to save OTA firmware image. Err: {}", e);
                             continue;
                         }
@@ -171,7 +170,7 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
             Event::OtaDeletePackage(update) => {
                 log::debug!("bucket_run: OtaDeletePackage");
 
-                if let Err(e) = delete_ota_firmware_image(&update.uid).await {
+                if let Err(e) = delete_ota_firmware_image(&settings.image_path, &update.uid).await {
                     log::warn!("Unable to delete OTA firmwar image: Error: {}", e);
                 }
 
@@ -185,8 +184,14 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
 }
 
 /// Take binary data and save it to the image directory..
-async fn save_ota_firmware_image(name: &str, image: &Vec<u8>) -> Result<()> {
-    let mut file = File::create(format!("{}/{}.bin", IMAGE_FOLDER_PATH, name))?;
+async fn save_ota_firmware_image(path: &str, name: &str, image: &Vec<u8>) -> Result<()> {
+    // Make directory if it doesn't exist...
+    if let Err(e) = fs::create_dir_all(path) {
+        log::warn!("Unable to create image directory: {}", e);
+    }
+
+    // Create the file
+    let mut file = File::create(format!("{}/{}.bin", path, name))?;
 
     // Write and sync
     file.write_all(&image)?;
@@ -195,20 +200,15 @@ async fn save_ota_firmware_image(name: &str, image: &Vec<u8>) -> Result<()> {
     Ok(())
 }
 
-async fn delete_ota_firmware_image(name: &str) -> Result<()> {
+async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
     // Delete from filesystem
-    fs::remove_file(format!("{}/{}.bin", IMAGE_FOLDER_PATH, &name))?;
+    fs::remove_file(format!("{}/{}.bin", path, &name))?;
 
     Ok(())
 }
 
 /// Creates the OTA package in the database and filesystem.
 async fn save_ota_package(db: &sled::Db, update: &OtaUpdate) -> Result<()> {
-    // Make directory if it doesn't exist...
-    if let Err(e) = fs::create_dir_all(IMAGE_FOLDER_PATH) {
-        log::warn!("Unable to create image directory: {}", e);
-    }
-
     if let Ok(entry) = db.get(&update.uid) {
         // Get the u8 data
         let data = entry.as_ref();
@@ -248,7 +248,7 @@ pub async fn ota_http_run(settings: &settings::Ota) {
     // TODO: API key for more secure transfers
 
     // Only one folder that we're interested in..
-    let images = warp::path("images").and(warp::fs::dir(&IMAGE_FOLDER_PATH));
+    let images = warp::path("images").and(warp::fs::dir(settings.image_path.clone()));
 
     // Run the `warp` server
     warp::serve(images)
@@ -311,10 +311,14 @@ mod tests {
         // Check the database to make sure there's an entry
         assert!(db.contains_key(&update.uid).unwrap());
 
+        // Save the image to disk
+        if let Err(e) = save_ota_firmware_image("./images/", &update.uid, &image.to_vec()).await {
+            log::error!("Error: {}", e);
+            assert!(false);
+        }
+
         // check to make sure the file exists int he correct folder.
-        assert!(
-            std::path::Path::new(&format!("{}/{}.bin", IMAGE_FOLDER_PATH, update.uid)).exists()
-        );
+        assert!(std::path::Path::new(&format!("{}/{}.bin", "./images/", update.uid)).exists());
     }
 
     #[tokio::test]
@@ -414,7 +418,7 @@ mod tests {
         }
 
         // Save the image to disk
-        if let Err(e) = save_ota_firmware_image(&update.uid, &image.to_vec()).await {
+        if let Err(e) = save_ota_firmware_image("./images/", &update.uid, &image.to_vec()).await {
             log::error!("Error: {}", e);
             assert!(false);
         }
@@ -423,7 +427,7 @@ mod tests {
         let res = delete_ota_package(&db, &update).await;
         assert!(res.is_ok());
 
-        let res = delete_ota_firmware_image(&update.uid).await;
+        let res = delete_ota_firmware_image("./images/", &update.uid).await;
         assert!(res.is_ok());
     }
 
@@ -446,7 +450,7 @@ mod tests {
         log::info!("{:?}", res);
         assert!(res.is_ok());
 
-        let res = delete_ota_firmware_image(&update.uid).await;
+        let res = delete_ota_firmware_image("./images/", &update.uid).await;
         assert!(res.is_err());
     }
 }

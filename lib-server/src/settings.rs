@@ -34,6 +34,7 @@ pub struct Ota {
     pub url: String,
     pub db_path: String,
     pub http_port: u16,
+    pub image_path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
