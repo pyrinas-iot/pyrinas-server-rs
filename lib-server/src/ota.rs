@@ -123,28 +123,28 @@ pub(crate) async fn process_event(
             }
         }
 
-        Event::OtaDeassociate {
+        Event::OtaDissociate {
             device_id,
             group_id,
         } => {
             // Match the different possiblities
             match (&device_id, &group_id) {
                 (None, Some(g)) => {
-                    if let Err(_) = deassociate_group(&db, &g).await {
+                    if let Err(_) = dissociate_group(&db, &g).await {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
                 }
                 (Some(d), None) => {
-                    if let Err(_) = deassociate_device(&db, &d).await {
+                    if let Err(_) = dissociate_device(&db, &d).await {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
                 (Some(d), Some(g)) => {
-                    if let Err(_) = deassociate_group(&db, &g).await {
+                    if let Err(_) = dissociate_group(&db, &g).await {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
 
-                    if let Err(_) = deassociate_device(&db, &d).await {
+                    if let Err(_) = dissociate_device(&db, &d).await {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
@@ -154,10 +154,10 @@ pub(crate) async fn process_event(
         Event::OtaAssociate {
             device_id,
             group_id,
-            update_id,
+            image_id,
         } => {
             // Match the different possiblities
-            match (&device_id, &group_id, &update_id) {
+            match (&device_id, &group_id, &image_id) {
                 (None, Some(group), Some(update)) => {
                     // Connect group -> image
                     if let Err(err) = associate_group_with_update(&db, &group, &update).await {
@@ -210,7 +210,7 @@ pub(crate) async fn process_event(
                         "Unsupported associate command: {:?} {:?} {:?}",
                         device_id,
                         group_id,
-                        update_id
+                        image_id
                     );
                     return;
                 }
@@ -306,6 +306,9 @@ pub(crate) async fn process_event(
                 return;
             }
         }
+        Event::OtaDeletePackage(_update) => {
+            // TODO: implement this
+        }
         Event::OtaUpdateImageListRequest() => {
             let mut response = OtaImageListResponse { images: Vec::new() };
 
@@ -390,7 +393,7 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
     }
 }
 
-async fn deassociate_device(db: &OTADatabase, device_id: &String) -> Result<()> {
+async fn dissociate_device(db: &OTADatabase, device_id: &String) -> Result<()> {
     // Delete entry from dB
     db.devices.remove(&device_id)?;
     db.devices.flush_async().await?;
@@ -398,7 +401,7 @@ async fn deassociate_device(db: &OTADatabase, device_id: &String) -> Result<()> 
     Ok(())
 }
 
-async fn deassociate_group(db: &OTADatabase, group_id: &String) -> Result<()> {
+async fn dissociate_group(db: &OTADatabase, group_id: &String) -> Result<()> {
     // Delete entry from dB
     db.groups.remove(&group_id)?;
     db.groups.flush_async().await?;

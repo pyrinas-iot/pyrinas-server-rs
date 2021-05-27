@@ -1,3 +1,4 @@
+use pyrinas_shared::OTAImageData;
 // Cbor
 use serde_cbor;
 
@@ -10,6 +11,8 @@ use tungstenite::{client::AutoStream, protocol::WebSocket, Message};
 
 // Error handling
 use thiserror::Error;
+
+use crate::OtaAssociate;
 
 #[derive(Debug, Error)]
 pub enum OtaError {
@@ -46,7 +49,7 @@ pub enum OtaError {
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> Result<(), OtaError> {
+pub fn add_ota(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
     // Get the current version using 'git describe'
     let ver = crate::get_git_describe()?;
 
@@ -54,11 +57,9 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> Resul
     let (ver, dirty) = crate::get_ota_package_version(&ver)?;
 
     // Force error
-    if dirty && !req.force {
+    if dirty {
         return Err(OtaError::DirtyError);
     }
-
-    println!("Adding new update for {}", req.uid);
 
     // Path for ota
     let path = "./build/zephyr/app_update.bin";
@@ -72,14 +73,18 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> Resul
 
     // Data structure (from pyrinas_lib_shared)
     let new = pyrinas_shared::OtaUpdate {
-        uid: req.uid.clone(),
+        uid: None,
         package: Some(pyrinas_shared::OTAPackage {
             version: ver,
-            host: "".to_string(),
-            file: "".to_string(),
-            force: req.force,
+            files: Vec::new(),
         }),
-        image: Some(buf),
+        images: Some(
+            [OTAImageData {
+                data: buf,
+                image_type: pyrinas_shared::OTAImageType::Primary,
+            }]
+            .to_vec(),
+        ),
     };
 
     // Serialize to cbor
@@ -101,4 +106,74 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, req: &crate::OtaAdd) -> Resul
     Ok(())
 }
 
-// TODO: remove command..
+pub fn associate(
+    stream: &mut WebSocket<AutoStream>,
+    associate: &OtaAssociate,
+) -> Result<(), OtaError> {
+    // Then configure the outer data
+    let msg = pyrinas_shared::ManagementData {
+        cmd: pyrinas_shared::ManagmentDataType::Associate,
+        target: None,
+        msg: serde_cbor::to_vec(associate)?,
+    };
+
+    // If second encode looks good send it off
+    let data = serde_cbor::to_vec(&msg)?;
+
+    // Send over socket
+    stream.write_message(Message::binary(data))?;
+
+    Ok(())
+}
+
+/// Adds and OTA image from an included manifest file to the server
+pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Result<(), OtaError> {
+    // Then configure the outer data
+    let msg = pyrinas_shared::ManagementData {
+        cmd: pyrinas_shared::ManagmentDataType::RemoveOta,
+        target: None,
+        msg: image_id.as_bytes().to_vec(),
+    };
+
+    // If second encode looks good send it off
+    let data = serde_cbor::to_vec(&msg)?;
+
+    // Send over socket
+    stream.write_message(Message::binary(data))?;
+
+    Ok(())
+}
+
+pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
+    // Then configure the outer data
+    let msg = pyrinas_shared::ManagementData {
+        cmd: pyrinas_shared::ManagmentDataType::GetGroupList,
+        target: None,
+        msg: [].to_vec(),
+    };
+
+    // If second encode looks good send it off
+    let data = serde_cbor::to_vec(&msg)?;
+
+    // Send over socket
+    stream.write_message(Message::binary(data))?;
+
+    Ok(())
+}
+
+pub fn get_ota_image_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
+    // Then configure the outer data
+    let msg = pyrinas_shared::ManagementData {
+        cmd: pyrinas_shared::ManagmentDataType::GetImageList,
+        target: None,
+        msg: [].to_vec(),
+    };
+
+    // If second encode looks good send it off
+    let data = serde_cbor::to_vec(&msg)?;
+
+    // Send over socket
+    stream.write_message(Message::binary(data))?;
+
+    Ok(())
+}

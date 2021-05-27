@@ -3,6 +3,8 @@ use std::{fmt, str};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
+use clap::{crate_version, Clap};
+
 // Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct OTAPackageVersion {
@@ -142,6 +144,10 @@ pub enum ManagmentDataType {
     Application,
     AddOta,
     RemoveOta,
+    Associate,
+    Dissociate,
+    GetGroupList,
+    GetImageList,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -178,4 +184,16 @@ pub struct ApplicationData {
     pub uid: String,
     pub target: String,
     pub msg: Vec<u8>,
+}
+
+/// Used to associate
+#[derive(Clap, Debug, Serialize, Deserialize)]
+#[clap(version = crate_version!())]
+pub struct OtaAssociate {
+    /// Device Id
+    pub device_id: Option<String>,
+    /// Group Id
+    pub group_id: Option<String>,
+    /// Image id to be directed to
+    pub image_id: Option<String>,
 }

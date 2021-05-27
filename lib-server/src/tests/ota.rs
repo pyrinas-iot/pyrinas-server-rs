@@ -483,7 +483,7 @@ async fn test_ota_request_assign_an_check() {
     let event = Event::OtaAssociate {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
-        update_id: Some(update_id.clone()),
+        image_id: Some(update_id.clone()),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;
@@ -610,7 +610,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     let event = Event::OtaAssociate {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
-        update_id: Some(update_id.clone()),
+        image_id: Some(update_id.clone()),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;
@@ -661,7 +661,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
 
 #[tokio::test]
 /// Checks to make sure there's a failure when trying to delete a non-existent file
-async fn test_ota_request_associate_and_deassociate() {
+async fn test_ota_request_associate_and_Dissociate() {
     // Log setup
     setup();
 
@@ -689,7 +689,7 @@ async fn test_ota_request_associate_and_deassociate() {
     let event = Event::OtaAssociate {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
-        update_id: Some(update_id.clone()),
+        image_id: Some(update_id.clone()),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;
@@ -698,7 +698,7 @@ async fn test_ota_request_associate_and_deassociate() {
     receiver.recv().unwrap();
 
     // Then assign the new image to a device
-    let event = Event::OtaDeassociate {
+    let event = Event::OtaDissociate {
         device_id: Some("1234".to_string()),
         group_id: None,
     };

@@ -3,6 +3,7 @@ pub mod device;
 pub mod ota;
 
 use clap::{crate_version, Clap};
+use pyrinas_shared::OtaAssociate;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, io, num, path::PathBuf};
 
@@ -101,28 +102,23 @@ pub enum CertSubcommand {
 #[clap(version = crate_version!())]
 pub enum OtaSubCommand {
     /// Add OTA package
-    Add(OtaAdd),
+    Add,
+    /// Associate command
+    Associate(OtaAssociate),
     /// Remove OTA package
     Remove(OtaRemove),
-}
-
-/// Add a new OTA package to the sever
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
-pub struct OtaAdd {
-    /// UID to be directed to
-    pub uid: String,
-    // Force the update
-    #[clap(long, short)]
-    pub force: bool,
+    /// List groups
+    ListGroups,
+    /// List images
+    ListImages,
 }
 
 /// Remove a OTA package from the sever
 #[derive(Clap, Debug)]
 #[clap(version = crate_version!())]
 pub struct OtaRemove {
-    /// UID to be directed to
-    pub uid: String,
+    /// Image id to be directed to
+    pub image_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

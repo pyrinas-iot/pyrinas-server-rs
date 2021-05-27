@@ -120,14 +120,14 @@ pub enum Event {
     },
     OtaDeletePackage(OtaUpdate),
     OtaNewPackage(OtaUpdate),
-    OtaDeassociate {
+    OtaDissociate {
         device_id: Option<String>,
         group_id: Option<String>,
     },
     OtaAssociate {
         device_id: Option<String>,
         group_id: Option<String>,
-        update_id: Option<String>,
+        image_id: Option<String>,
     }, // Associate device with update
     OtaRequest {
         device_id: String,

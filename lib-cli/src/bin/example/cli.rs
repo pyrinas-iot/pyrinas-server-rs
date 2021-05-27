@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use chrono::{Duration, Utc};
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
@@ -35,37 +36,70 @@ fn main() -> anyhow::Result<()> {
 
     // Process command.
     match opts.subcmd {
-        SubCommand::Ota(c) => match c.subcmd {
-            OtaSubCommand::Add(s) => {
-                // Get socket
-                let mut socket = match pyrinas_cli::get_socket(&config) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        return Err(anyhow!("Unable to get socket to Pyrinas! Err: {}", e));
+        SubCommand::Ota(c) => {
+            // Get socket
+            let mut socket = pyrinas_cli::get_socket(&config)?;
+
+            match c.subcmd {
+                OtaSubCommand::Add => {
+                    crate::ota::add_ota(&mut socket)?;
+
+                    println!("OTA image successfully uploaded!");
+                }
+                OtaSubCommand::Remove(r) => {
+                    crate::ota::remove_ota(&mut socket, &r.image_id)?;
+
+                    println!("{} successfully removed!", &r.image_id);
+                }
+                OtaSubCommand::Associate(a) => {
+                    crate::ota::associate(&mut socket, &a)?;
+
+                    println!("Associated! {:?}", &a);
+                }
+                OtaSubCommand::ListGroups => {
+                    crate::ota::get_ota_group_list(&mut socket)?;
+
+                    let start = Utc::now();
+
+                    // Get message
+                    loop {
+                        if Utc::now() > start + Duration::seconds(10) {
+                            eprintln!("No response from server!");
+                            break;
+                        }
+
+                        match socket.read_message() {
+                            Ok(msg) => {
+                                println!("{:?}", msg);
+                                // TODO: do stuff with message
+                            }
+                            Err(_) => continue,
+                        };
                     }
-                };
+                }
+                OtaSubCommand::ListImages => {
+                    crate::ota::get_ota_image_list(&mut socket)?;
 
-                // Then process
-                if let Err(e) = crate::ota::add_ota(&mut socket, &s) {
-                    eprintln!("Err: {}", e);
-                    return Err(anyhow!("Unable to add OTA!"));
-                };
+                    let start = Utc::now();
 
-                println!("OTA image successfully uploaded!");
-            }
-            OtaSubCommand::Remove(_r) => {
-                // Get socket
-                let mut _socket = match pyrinas_cli::get_socket(&config) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        return Err(anyhow!("Unable to get socket to Pyrinas!"));
+                    // Get message
+                    loop {
+                        if Utc::now() > start + Duration::seconds(10) {
+                            eprintln!("No response from server!");
+                            break;
+                        }
+
+                        match socket.read_message() {
+                            Ok(msg) => {
+                                println!("{:?}", msg);
+                                // TODO: do stuff with message
+                            }
+                            Err(_) => continue,
+                        };
                     }
-                };
-
-                // TODO: run the remove function
-            }
-        },
+                }
+            };
+        }
         SubCommand::Cert(c) => {
             // Depending on the input, create CA, server or client cert
             match c.subcmd {
