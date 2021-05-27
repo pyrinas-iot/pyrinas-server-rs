@@ -25,7 +25,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
         // Get the uid and topic
         let mut topic = msg.topic.split('/');
 
-        let uid = match topic.next() {
+        let device_id = match topic.next() {
             Some(t) => t,
             None => {
                 log::warn!("Unable get uid.");
@@ -80,7 +80,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                             // Send message to broker
                             broker_sender
                                 .send_async(Event::OtaRequest {
-                                    uid: uid.to_string(),
+                                    device_id: device_id.to_string(),
                                     msg: n,
                                 })
                                 .await
@@ -103,7 +103,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
 
                             // Create query
                             let query = n
-                                .to_influx_data(uid.to_string())
+                                .to_influx_data(device_id.to_string())
                                 .to_influx_query("telemetry".to_string());
 
                             // Send data to broker
@@ -116,12 +116,12 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                     }
                 }
                 "app" => {
-                    debug!("app: from:{:?}", uid.to_string());
+                    debug!("app: from:{:?}", device_id.to_string());
 
                     // Send data to broker
                     broker_sender
                         .send_async(Event::ApplicationRequest(pyrinas_shared::ApplicationData {
-                            uid: uid.to_string(),
+                            uid: device_id.to_string(),
                             target: target.to_string(),
                             msg: payload.to_vec(),
                         }))
@@ -168,12 +168,21 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
             Event::OtaResponse(update) => {
                 debug!("mqtt_run: Event::OtaResponse");
 
+                // Device id
+                let device_id = match update.uid {
+                    Some(id) => id,
+                    None => {
+                        log::warn!("No device id!");
+                        continue;
+                    }
+                };
+
                 // Serialize this buddy
                 let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
 
                 // Generate topic
                 // TODO: make these configurable
-                let sub_topic = format!("{}/ota/sub", update.uid);
+                let sub_topic = format!("{}/ota/sub", device_id);
 
                 debug!("Publishing message to {}", &sub_topic);
 

@@ -6,6 +6,7 @@ pub mod mqtt;
 pub mod ota;
 pub mod settings;
 pub mod telemetry;
+pub mod tests;
 
 pub use pyrinas_shared::*;
 
@@ -113,11 +114,30 @@ pub async fn run(
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    NewRunner { name: String, sender: Sender<Event> },
+    NewRunner {
+        name: String,
+        sender: Sender<Event>,
+    },
     OtaDeletePackage(OtaUpdate),
     OtaNewPackage(OtaUpdate),
-    OtaRequest { uid: String, msg: OtaRequest },
+    OtaDeassociate {
+        device_id: Option<String>,
+        group_id: Option<String>,
+    },
+    OtaAssociate {
+        device_id: Option<String>,
+        group_id: Option<String>,
+        update_id: Option<String>,
+    }, // Associate device with update
+    OtaRequest {
+        device_id: String,
+        msg: OtaRequest,
+    },
     OtaResponse(OtaUpdate),
+    OtaUpdateImageListRequest(), // Simple request to get all the firmware image information (id, name, desc, etc)
+    OtaUpdateImageListRequestResponse(OtaImageListResponse), // Message sent to show all the avilable OTA updates
+    OtaUpdateGroupListRequest(), // Simple request to get a list of all the groups with their memebers
+    OtaUpdateGroupListRequestResponse(OtaGroupListResponse), // Message sent to show all the avilable group info
     ApplicationManagementRequest(ManagementData), // Message sent for configuration of application
     ApplicationManagementResponse(ManagementData), // Reponse from application management portion of the app
     ApplicationRequest(ApplicationData),           // Request/event from a device
