@@ -3,6 +3,7 @@ use log::{debug, error, warn};
 
 // async related
 use flume::{unbounded, Sender};
+use pyrinas_shared::OtaUpdate;
 
 // Shared
 use crate::telemetry;
@@ -177,8 +178,17 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                     }
                 };
 
+                // Get the package
+                let package = match update.package {
+                    Some(p) => p,
+                    None => {
+                        log::warn!("No package!");
+                        continue;
+                    }
+                };
+
                 // Serialize this buddy
-                let res = serde_cbor::ser::to_vec_packed(&update.package).unwrap();
+                let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
 
                 // Generate topic
                 // TODO: make these configurable

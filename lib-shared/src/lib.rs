@@ -80,9 +80,9 @@ impl fmt::Display for OTAPackage {
 #[repr(u8)]
 pub enum OTAImageType {
     /// This is a main firmware image
-    Primary,
+    Primary = 1 << 0,
     /// This is a secondary file. Could be used as a pre-image download
-    Secondary,
+    Secondary = 1 << 1,
 }
 
 impl fmt::Display for OTAImageType {
