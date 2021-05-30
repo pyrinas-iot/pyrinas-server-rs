@@ -3,7 +3,6 @@ use log::{debug, error, warn};
 
 // async related
 use flume::{unbounded, Sender};
-use pyrinas_shared::OtaUpdate;
 
 // Shared
 use crate::telemetry;

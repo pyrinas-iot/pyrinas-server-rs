@@ -5,8 +5,8 @@ use pyrinas_shared::{
     OTAImageData, OTAImageType, OTAPackage, OTAPackageVersion, OtaRequest, OtaRequestCmd, OtaUpdate,
 };
 
-use crate::Event;
-use crate::{ota, settings};
+use pyrinas_server::Event;
+use pyrinas_server::{ota, settings};
 
 use std::path::Path;
 use std::sync::Once;
@@ -98,10 +98,7 @@ async fn save_ota_package_sucess() {
         .unwrap();
 
     // Get the file path
-    let file_path = format!(
-        "./images/{}/{}-{}.bin",
-        update_id, image.image_type, update_id
-    );
+    let file_path = format!("./images/{}/{}.bin", update_id, image.image_type);
 
     log::info!("filepath {}", file_path);
 
@@ -246,11 +243,10 @@ async fn test_ota_new_package_event() {
 
     // Get filepath
     let file_path = format!(
-        "{}/{}/{}-{}.bin",
+        "{}/{}/{}.bin",
         settings.image_path,
         update_id,
-        OTAImageType::Primary,
-        update_id
+        OTAImageType::Primary
     );
 
     // Check if it's saved to the filesystem
@@ -329,11 +325,10 @@ async fn test_ota_request_check_event_found() {
 
     // Get filepath
     let file_path = format!(
-        "{}/{}/{}-{}.bin",
+        "{}/{}/{}.bin",
         settings.image_path,
         update_id,
         OTAImageType::Primary,
-        update_id
     );
 
     // Check if the file exists
@@ -354,11 +349,10 @@ async fn test_ota_request_check_event_found() {
         "{} {}",
         package.files[0].file,
         format!(
-            "{}{}/{}-{}.bin",
+            "{}{}/{}.bin",
             settings.image_path,
             update_id,
-            OTAImageType::Primary,
-            update_id
+            OTAImageType::Primary
         )
     );
 
@@ -394,21 +388,19 @@ async fn test_ota_request_check_seconary_found() {
 
     // Check if the primary exists
     assert!(Path::new(&format!(
-        "{}/{}/{}-{}.bin",
+        "{}/{}/{}.bin",
         settings.image_path,
         update_id,
         OTAImageType::Primary,
-        update_id
     ))
     .exists());
 
     // Check if the secondary exists
     assert!(Path::new(&format!(
-        "{}/{}/{}-{}.bin",
+        "{}/{}/{}.bin",
         settings.image_path,
         update_id,
         OTAImageType::Secondary,
-        update_id
     ))
     .exists());
 
@@ -427,11 +419,10 @@ async fn test_ota_request_check_seconary_found() {
         "{} {}",
         package.files[0].file,
         format!(
-            "{}{}/{}-{}.bin",
+            "{}{}/{}.bin",
             settings.image_path,
             update_id,
             OTAImageType::Primary,
-            update_id
         )
     );
 
@@ -441,11 +432,10 @@ async fn test_ota_request_check_seconary_found() {
         "{} {}",
         package.files[1].file,
         format!(
-            "{}{}/{}-{}.bin",
+            "{}{}/{}.bin",
             settings.image_path,
             update_id,
             OTAImageType::Secondary,
-            update_id
         )
     );
 
@@ -512,11 +502,10 @@ async fn test_ota_request_assign_an_check() {
                 "{} {}",
                 package.files[0].file,
                 format!(
-                    "{}{}/{}-{}.bin",
+                    "{}{}/{}.bin",
                     settings.image_path,
                     update_id,
                     OTAImageType::Primary,
-                    update_id
                 )
             );
         }
@@ -661,7 +650,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
 
 #[tokio::test]
 /// Checks to make sure there's a failure when trying to delete a non-existent file
-async fn test_ota_request_associate_and_Dissociate() {
+async fn test_ota_request_associate_and_dissociate() {
     // Log setup
     setup();
 

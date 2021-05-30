@@ -6,7 +6,6 @@ pub mod mqtt;
 pub mod ota;
 pub mod settings;
 pub mod telemetry;
-pub mod tests;
 
 pub use pyrinas_shared::*;
 

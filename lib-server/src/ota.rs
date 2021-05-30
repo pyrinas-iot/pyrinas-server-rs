@@ -31,7 +31,7 @@ pub struct OTADatabase {
 }
 
 /// Get the OTA package from database by `update_id`
-pub(crate) fn get_ota_package(db: &OTADatabase, update_id: &String) -> Result<OTAPackage> {
+pub fn get_ota_package(db: &OTADatabase, update_id: &String) -> Result<OTAPackage> {
     // Check if there's a package available and ready
     let entry = match db.images.get(&update_id)? {
         Some(e) => e,
@@ -76,7 +76,7 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &String) -> Result<
 
 /// Used to initialize the separate trees involved in the database.
 /// Used for quick lookup for devices, groups and images
-pub(crate) fn init_trees(db: &sled::Db) -> Result<OTADatabase> {
+pub fn init_trees(db: &sled::Db) -> Result<OTADatabase> {
     Ok(OTADatabase {
         images: db.open_tree("images")?,
         devices: db.open_tree("devices")?,
@@ -85,7 +85,7 @@ pub(crate) fn init_trees(db: &sled::Db) -> Result<OTADatabase> {
 }
 
 /// Function that is called outside of the thread so it can be tested separately.
-pub(crate) async fn process_event(
+pub async fn process_event(
     settings: &settings::Ota,
     broker_sender: &Sender<Event>,
     db: &OTADatabase,
@@ -440,7 +440,7 @@ fn get_update_file_path(image_type: &OTAImageType, update_name: &String) -> Stri
 }
 
 /// Take binary data and save it to the image directory..
-pub(crate) async fn save_ota_firmware_image(
+pub async fn save_ota_firmware_image(
     folder_path: &String,
     name: &String,
     image: &OTAImageData,
@@ -473,7 +473,7 @@ pub(crate) async fn save_ota_firmware_image(
     Ok(())
 }
 
-pub(crate) async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
+pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
     // Delete the folder from the filesystem
     fs::remove_dir_all(format!("{}/{}/", path, &name))?;
 
@@ -483,7 +483,7 @@ pub(crate) async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<
 /// Creates the OTA package in the database and filesystem.
 ///
 /// This function overwrites any updates that may exist
-pub(crate) async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()> {
+pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()> {
     // Get the package
     let package = match &update.package {
         Some(p) => p,
@@ -504,7 +504,7 @@ pub(crate) async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Re
 }
 
 /// Deletes the OTA package from the database and filesystem.
-pub(crate) async fn delete_ota_package(db: &OTADatabase, update_id: &String) -> Result<()> {
+pub async fn delete_ota_package(db: &OTADatabase, update_id: &String) -> Result<()> {
     // Delete entry from dB
     db.images.remove(&update_id)?;
     db.images.flush_async().await?;
