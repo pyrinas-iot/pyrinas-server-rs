@@ -3,6 +3,7 @@ use chrono::{Duration, Utc};
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
+use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse};
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
@@ -41,8 +42,8 @@ fn main() -> anyhow::Result<()> {
             let mut socket = pyrinas_cli::get_socket(&config)?;
 
             match c.subcmd {
-                OtaSubCommand::Add => {
-                    crate::ota::add_ota(&mut socket)?;
+                OtaSubCommand::Add(a) => {
+                    crate::ota::add_ota(&mut socket, a.force)?;
 
                     println!("OTA image successfully uploaded!");
                 }
@@ -70,8 +71,26 @@ fn main() -> anyhow::Result<()> {
 
                         match socket.read_message() {
                             Ok(msg) => {
-                                println!("{:?}", msg);
-                                // TODO: do stuff with message
+                                let data = match msg {
+                                    tungstenite::Message::Binary(b) => b,
+                                    _ => {
+                                        eprintln!("Unexpected WS message!");
+                                        break;
+                                    }
+                                };
+
+                                let list: OtaGroupListResponse = match serde_cbor::from_slice(&data)
+                                {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        eprintln!("Unable to get image list! Error: {}", e);
+                                        break;
+                                    }
+                                };
+
+                                println!("{:?}", list);
+
+                                break;
                             }
                             Err(_) => continue,
                         };
@@ -91,8 +110,26 @@ fn main() -> anyhow::Result<()> {
 
                         match socket.read_message() {
                             Ok(msg) => {
-                                println!("{:?}", msg);
-                                // TODO: do stuff with message
+                                let data = match msg {
+                                    tungstenite::Message::Binary(b) => b,
+                                    _ => {
+                                        eprintln!("Unexpected WS message!");
+                                        break;
+                                    }
+                                };
+
+                                let list: OtaImageListResponse = match serde_cbor::from_slice(&data)
+                                {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        eprintln!("Unable to get image list! Error: {}", e);
+                                        break;
+                                    }
+                                };
+
+                                println!("{:?}", list);
+
+                                break;
                             }
                             Err(_) => continue,
                         };

@@ -102,7 +102,7 @@ pub enum CertSubcommand {
 #[clap(version = crate_version!())]
 pub enum OtaSubCommand {
     /// Add OTA package
-    Add,
+    Add(OtaAdd),
     /// Associate command
     Associate(OtaAssociate),
     /// Remove OTA package
@@ -111,6 +111,15 @@ pub enum OtaSubCommand {
     ListGroups,
     /// List images
     ListImages,
+}
+
+/// Add a OTA package from the sever
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub struct OtaAdd {
+    /// Force updating in dirty repository
+    #[clap(long, short)]
+    pub force: bool,
 }
 
 /// Remove a OTA package from the sever

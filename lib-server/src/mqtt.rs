@@ -177,17 +177,11 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                     }
                 };
 
-                // Get the package
-                let package = match update.package {
-                    Some(p) => p,
-                    None => {
-                        log::warn!("No package!");
-                        continue;
-                    }
+                // Get the package. Subtitute with empty one if not valid.
+                let res = match update.package {
+                    Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
+                    None => Vec::new(),
                 };
-
-                // Serialize this buddy
-                let res = serde_cbor::ser::to_vec_packed(&package).unwrap();
 
                 // Generate topic
                 // TODO: make these configurable

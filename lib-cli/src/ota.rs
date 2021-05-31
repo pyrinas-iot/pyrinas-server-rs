@@ -49,7 +49,7 @@ pub enum OtaError {
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
+pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<(), OtaError> {
     // Get the current version using 'git describe'
     let ver = crate::get_git_describe()?;
 
@@ -57,7 +57,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
     let (ver, dirty) = crate::get_ota_package_version(&ver)?;
 
     // Force error
-    if dirty {
+    if dirty && !force {
         return Err(OtaError::DirtyError);
     }
 

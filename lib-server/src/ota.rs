@@ -283,10 +283,7 @@ pub async fn process_event(
                 files.push(OTAPackageFileInfo {
                     image_type: image.image_type,
                     host: settings.url.clone(),
-                    file: format!(
-                        "{}{}/{}.bin",
-                        &settings.image_path, &update_id, &image.image_type
-                    ),
+                    file: format!("/images/{}/{}.bin", &update_id, &image.image_type),
                 });
             }
 

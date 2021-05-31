@@ -39,7 +39,7 @@ async fn handle_connection(
     log::debug!("Got stream!");
 
     // Ensure only one admin connection
-    if !client.lock().await.is_some() {
+    if client.lock().await.is_some() {
         log::warn!("Already connected to admin client!");
         return;
     }
