@@ -107,13 +107,29 @@ Here's what's on my plate and what's to come:
   - [ ] Zephyr side as well
 - [x] Uploading an OTA package directly from Zephyr based repository
  - [x] Clean build checks
-- [ ] Removing update remotely
+- [x] Removing update remotely
 - [ ] Implement more tests around:
- - [ ] Broker and optional broker capabilties 
- - [ ] Better coverage in OTA
- - [ ] Better coverage in Mqtt
- - [ ] Better coverage in Admin area
-- [ ] More functionality/control for Admin
+  - [ ] Broker and optional broker capabilties 
+  - [x] Better coverage in OTA
+  - [ ] Better coverage in Mqtt
+  - [ ] Better coverage in Admin area
+- [x] OTA control for CLI
+  - [x] Add and remove images
+  - [x] Associate images with device
+  - [x] Group management
+  - [x] Add and associate image to a specific device
+- [x] Support for multi-image uploads
+- [ ] Secure MQTT functionality
+  - [ ] Passwords
+  - [ ] TLS Client Authentication
+- [ ] Remote logging
+- [ ] Multi-instance CLI mode (switching between different Pyrinas instances)
+- [ ] Get CI up and running
+- [ ] CI building on releases
+- [x] Cert generation via CLI
+  - [x] Client cert
+  - [x] Server cert
+  - [x] CA Cert
 
 ## Don't see what you're looking for?
 
