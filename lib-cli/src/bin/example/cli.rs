@@ -104,7 +104,10 @@ fn main() -> anyhow::Result<()> {
                                     }
                                 };
 
-                                println!("{:?}", list);
+                                for name in list.groups.iter() {
+                                    // Print out the entry
+                                    println!("{}", name);
+                                }
 
                                 break;
                             }
@@ -143,7 +146,16 @@ fn main() -> anyhow::Result<()> {
                                     }
                                 };
 
-                                println!("{:?}", list);
+                                for (name, package) in list.images.iter() {
+                                    // Get the date
+                                    let date = match package.date_added {
+                                        Some(d) => d.to_string(),
+                                        None => "".to_string(),
+                                    };
+
+                                    // Print out the entry
+                                    println!("{} {}", name, date);
+                                }
 
                                 break;
                             }
