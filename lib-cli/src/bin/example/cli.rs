@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
-use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse};
+use pyrinas_shared::{OtaAssociate, OtaGroupListResponse, OtaImageListResponse};
 
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
@@ -43,9 +43,25 @@ fn main() -> anyhow::Result<()> {
 
             match c.subcmd {
                 OtaSubCommand::Add(a) => {
-                    crate::ota::add_ota(&mut socket, a.force)?;
+                    let image_id = crate::ota::add_ota(&mut socket, a.force)?;
 
                     println!("OTA image successfully uploaded!");
+
+                    // Do association
+                    match a.device_id {
+                        Some(device_id) => {
+                            let a = OtaAssociate {
+                                device_id: Some(device_id.clone()),
+                                group_id: Some(device_id),
+                                image_id: Some(image_id),
+                            };
+
+                            crate::ota::associate(&mut socket, &a)?;
+
+                            println!("Associated! {:?}", &a);
+                        }
+                        None => (),
+                    };
                 }
                 OtaSubCommand::Remove(r) => {
                     crate::ota::remove_ota(&mut socket, &r.image_id)?;

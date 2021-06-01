@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-cli"
-version = "0.2.5"
+version = "0.3.0"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"

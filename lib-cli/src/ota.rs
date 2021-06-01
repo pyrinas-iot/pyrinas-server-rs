@@ -49,12 +49,12 @@ pub enum OtaError {
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<(), OtaError> {
+pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String, OtaError> {
     // Get the current version using 'git describe'
     let ver = crate::get_git_describe()?;
 
     // Then parse it to get OTAPackageVersion
-    let (ver, dirty) = crate::get_ota_package_version(&ver)?;
+    let (package_version, dirty) = crate::get_ota_package_version(&ver)?;
 
     // Force error
     if dirty && !force {
@@ -75,7 +75,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<(), Ot
     let new = pyrinas_shared::OtaUpdate {
         uid: None,
         package: Some(pyrinas_shared::OTAPackage {
-            version: ver,
+            version: package_version.clone(),
             files: Vec::new(),
         }),
         images: Some(
@@ -103,7 +103,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<(), Ot
     // Send over socket
     stream.write_message(Message::binary(data))?;
 
-    Ok(())
+    Ok(package_version.to_string())
 }
 
 pub fn associate(

@@ -282,8 +282,8 @@ pub async fn process_event(
                 // Add image data to the Ota Package
                 files.push(OTAPackageFileInfo {
                     image_type: image.image_type,
-                    host: settings.url.clone(),
-                    file: format!("/images/{}/{}.bin", &update_id, &image.image_type),
+                    host: format!("https://{}", &settings.url),
+                    file: format!("images/{}/{}.bin", &update_id, &image.image_type),
                 });
             }
 
@@ -303,8 +303,29 @@ pub async fn process_event(
                 return;
             }
         }
-        Event::OtaDeletePackage(_update) => {
-            // TODO: implement this
+        Event::OtaDeletePackage(update_id) => {
+            match update_id.as_str() {
+                // Delete all option
+                "*" => {
+                    if let Err(e) = delete_all_ota_data(&db, &settings).await {
+                        log::warn!("Unable to delete all ota data. Err: {}", e);
+                    }
+                }
+                // Delete a signle update
+                _ => {
+                    // Delete by ID
+                    if let Err(e) = delete_ota_package(&db, &update_id).await {
+                        log::warn!("Unable to remove ota package for {}. Err: {}", update_id, e);
+                    };
+
+                    // Delete folder
+                    if let Err(e) =
+                        delete_ota_firmware_image(&settings.image_path, &update_id).await
+                    {
+                        log::warn!("Unable to removed files for {}. Err: {}", update_id, e);
+                    }
+                }
+            };
         }
         Event::OtaUpdateImageListRequest() => {
             let mut response = OtaImageListResponse { images: Vec::new() };
@@ -406,6 +427,16 @@ async fn dissociate_group(db: &OTADatabase, group_id: &String) -> Result<()> {
     Ok(())
 }
 
+async fn delete_all_ota_data(db: &OTADatabase, settings: &settings::Ota) -> Result<()> {
+    // Clear them first
+    db.images.clear()?;
+    db.images.flush_async().await?;
+
+    fs::remove_dir_all(&settings.image_path)?;
+
+    Ok(())
+}
+
 /// Associate device_id with group_id
 async fn associate_device_with_group(
     db: &OTADatabase,
@@ -470,7 +501,7 @@ pub async fn save_ota_firmware_image(
     Ok(())
 }
 
-pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
+pub async fn delete_ota_firmware_image(path: &String, name: &String) -> Result<()> {
     // Delete the folder from the filesystem
     fs::remove_dir_all(format!("{}/{}/", path, &name))?;
 

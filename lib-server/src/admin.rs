@@ -3,7 +3,6 @@ use std::sync::Arc;
 // async Related
 use flume::{unbounded, Sender};
 use futures::{FutureExt, StreamExt};
-use pyrinas_shared::OtaUpdate;
 use tokio::sync::Mutex;
 use warp::ws::Message;
 
@@ -115,15 +114,9 @@ async fn handle_connection(
                     }
                 };
 
-                let update = OtaUpdate {
-                    uid: Some(image_id),
-                    package: None,
-                    images: None,
-                };
-
                 // Send if decode was successful
                 let _ = broker_sender
-                    .send_async(Event::OtaDeletePackage(update))
+                    .send_async(Event::OtaDeletePackage(image_id))
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");
             }

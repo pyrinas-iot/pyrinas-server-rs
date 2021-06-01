@@ -117,7 +117,7 @@ pub enum Event {
         name: String,
         sender: Sender<Event>,
     },
-    OtaDeletePackage(OtaUpdate),
+    OtaDeletePackage(String),
     OtaNewPackage(OtaUpdate),
     OtaDissociate {
         device_id: Option<String>,

@@ -120,6 +120,10 @@ pub struct OtaAdd {
     /// Force updating in dirty repository
     #[clap(long, short)]
     pub force: bool,
+    /// Option to autmoatically associate with device.
+    ///Device group also set to device id.
+    #[clap(long, short)]
+    pub device_id: Option<String>,
 }
 
 /// Remove a OTA package from the sever
