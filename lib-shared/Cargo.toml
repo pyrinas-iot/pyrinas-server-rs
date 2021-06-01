@@ -15,3 +15,4 @@ keywords = ["ota", "mqtt", "iot"]
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing
 serde_repr = "0.1"
 clap = "3.0.0-beta.2" # CLI Library
+chrono = { version = "0.4", features = ["serde"] }

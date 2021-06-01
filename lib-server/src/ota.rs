@@ -64,12 +64,15 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &String) -> Result<
     };
 
     // Check if there's a package available and ready
-    let package: OTAPackage = match db.images.get(&image_id)? {
+    let mut package: OTAPackage = match db.images.get(&image_id)? {
         Some(e) => serde_cbor::from_slice(&e)?,
         None => {
             return Err(anyhow!("No data available."));
         }
     };
+
+    // Remove timestamp
+    package.date_added = None;
 
     Ok(package)
 }

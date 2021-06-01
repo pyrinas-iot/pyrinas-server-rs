@@ -1,3 +1,4 @@
+use chrono::Utc;
 // async Related
 use flume::unbounded;
 
@@ -31,6 +32,7 @@ fn get_update(major: u8, minor: u8, patch: u8, has_secondary: bool) -> OtaUpdate
             hash: hash.into(),
         },
         files: Vec::new(),
+        date_added: Some(Utc::now()),
     };
 
     let mut images: Vec<OTAImageData> = Vec::new();
@@ -182,7 +184,7 @@ async fn delete_ota_package_success() {
     ota::delete_ota_package(&db, &update_id).await.unwrap();
 
     // Delete the image folder
-    ota::delete_ota_firmware_image("./images/", &update_id)
+    ota::delete_ota_firmware_image(&"./images/".to_string(), &update_id)
         .await
         .unwrap();
 
@@ -207,7 +209,7 @@ async fn delete_ota_package_failure() {
     let res = ota::delete_ota_package(&db, &update_id).await;
     assert!(res.is_ok());
 
-    let res = ota::delete_ota_firmware_image("./images/", &update_id).await;
+    let res = ota::delete_ota_firmware_image(&"./images/".to_string(), &update_id).await;
     assert!(res.is_err());
 }
 
@@ -343,7 +345,7 @@ async fn test_ota_request_check_event_found() {
 
     assert_eq!(package.files.len(), 1);
 
-    assert_eq!(package.files[0].host, settings.url);
+    assert_eq!(package.files[0].host, format!("https://{}", settings.url));
 
     log::debug!(
         "{} {}",
@@ -413,7 +415,7 @@ async fn test_ota_request_check_seconary_found() {
 
     assert_eq!(package.files.len(), 2);
 
-    assert_eq!(package.files[0].host, settings.url);
+    assert_eq!(package.files[0].host, format!("https://{}", settings.url));
 
     log::debug!(
         "{} {}",
@@ -426,7 +428,7 @@ async fn test_ota_request_check_seconary_found() {
         )
     );
 
-    assert_eq!(package.files[1].host, settings.url);
+    assert_eq!(package.files[1].host, format!("https://{}", settings.url));
 
     log::debug!(
         "{} {}",
@@ -496,7 +498,7 @@ async fn test_ota_request_assign_an_check() {
 
             assert_eq!(package.files.len(), 1);
 
-            assert_eq!(package.files[0].host, settings.url);
+            assert_eq!(package.files[0].host, format!("https://{}", settings.url));
 
             log::debug!(
                 "{} {}",

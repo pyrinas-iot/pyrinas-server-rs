@@ -3,6 +3,8 @@ use std::{fmt, str};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
+use chrono::{DateTime, Utc};
+
 use clap::{crate_version, Clap};
 
 // Struct that gets serialized for OTA support
@@ -68,6 +70,8 @@ pub struct OTAPackage {
     pub version: OTAPackageVersion,
     /// All files associated with this package
     pub files: Vec<OTAPackageFileInfo>,
+    /// Timestamp for tracking when this was added
+    pub date_added: Option<DateTime<Utc>>,
 }
 
 impl fmt::Display for OTAPackage {

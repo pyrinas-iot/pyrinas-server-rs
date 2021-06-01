@@ -1,3 +1,4 @@
+use chrono::Utc;
 use pyrinas_shared::OTAImageData;
 // Cbor
 use serde_cbor;
@@ -77,6 +78,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
         package: Some(pyrinas_shared::OTAPackage {
             version: package_version.clone(),
             files: Vec::new(),
+            date_added: Some(Utc::now()),
         }),
         images: Some(
             [OTAImageData {
