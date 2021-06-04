@@ -10,7 +10,7 @@ readme = "https://raw.githubusercontent.com/pyrinas-iot/pyrinas-server-rs/main/R
 keywords = ["ota", "mqtt", "iot"]
 
 [[bin]]
-name = "pyrinas-cli"
+name = "pyrinas"
 path = "src/bin/example/cli.rs"
 
 [dependencies]
