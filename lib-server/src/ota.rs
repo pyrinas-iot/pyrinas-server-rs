@@ -1,6 +1,6 @@
 // async Related
 use flume::{unbounded, Sender};
-use pyrinas_shared::OtaGroupListResponse;
+use pyrinas_shared::ota::{self, OtaUpdateVersioned, OtaVersion};
 use std::io::Write;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
@@ -12,10 +12,10 @@ use anyhow::{anyhow, Result};
 
 // Local lib related
 use crate::{settings, Event};
-use pyrinas_shared::{
-    OTAImageData, OTAImageType, OTAPackage, OTAPackageFileInfo, OtaImageListResponse,
-    OtaRequestCmd, OtaUpdate,
+use pyrinas_shared::ota::v2::{
+    OTAImageData, OTAImageType, OTAPackage, OTAPackageFileInfo, OtaUpdate,
 };
+use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse, OtaRequestCmd};
 
 // warp
 use warp::{self, Filter};
@@ -113,13 +113,60 @@ pub async fn process_event(
                     // Lookup
                     let package = get_ota_package_by_device_id(&db, &device_id).ok();
 
+                    // Get version. No version? Must be v1
+                    let version = match &msg.version {
+                        Some(v) => v.clone(),
+                        None => OtaVersion::V1,
+                    };
+
+                    // Map the OTA update depending on version
+                    let update = match version {
+                        pyrinas_shared::ota::OtaVersion::V1 => {
+                            // Get package data and transform it into a V1
+                            let package: Option<ota::v1::OTAPackage> = match package {
+                                Some(p) => {
+                                    let image = p
+                                        .files
+                                        .iter()
+                                        .filter(|x| x.image_type == OTAImageType::Primary)
+                                        .nth(0);
+
+                                    // Depending if there's a primary image, organize
+                                    match image {
+                                        Some(i) => Some(ota::v1::OTAPackage {
+                                            version: p.version.clone(),
+                                            host: i.host.clone(),
+                                            file: i.file.clone(),
+                                            force: false,
+                                        }),
+                                        None => None,
+                                    }
+                                }
+                                None => None,
+                            };
+
+                            OtaUpdateVersioned {
+                                v1: Some(ota::v1::OtaUpdate {
+                                    uid: device_id.clone(),
+                                    package: package,
+                                    image: None,
+                                }),
+                                v2: None,
+                            }
+                        }
+                        pyrinas_shared::ota::OtaVersion::V2 => OtaUpdateVersioned {
+                            v1: None,
+                            v2: Some(OtaUpdate {
+                                uid: Some(device_id.clone()),
+                                package: package,
+                                images: None,
+                            }),
+                        },
+                    };
+
                     // Send it
                     broker_sender
-                        .send_async(Event::OtaResponse(OtaUpdate {
-                            uid: Some(device_id.clone()),
-                            package: package,
-                            images: None,
-                        }))
+                        .send_async(Event::OtaResponse(update))
                         .await
                         .unwrap();
                 }
@@ -231,10 +278,13 @@ pub async fn process_event(
                     }
                 };
 
-                let update = OtaUpdate {
-                    uid: Some(device.to_string()),
-                    package: Some(package),
-                    images: None,
+                let update = OtaUpdateVersioned {
+                    v1: None,
+                    v2: Some(OtaUpdate {
+                        uid: Some(device.to_string()),
+                        package: Some(package),
+                        images: None,
+                    }),
                 };
 
                 // Notify mqtt to send update!

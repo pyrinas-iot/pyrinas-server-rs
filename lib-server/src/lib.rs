@@ -14,6 +14,7 @@ use influxdb::{ReadQuery, WriteQuery};
 
 // Async Related
 use flume::{Receiver, Sender};
+use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned};
 use std::sync::Arc;
 
 #[cfg(feature = "runtime_tokio")]
@@ -132,7 +133,7 @@ pub enum Event {
         device_id: String,
         msg: OtaRequest,
     },
-    OtaResponse(OtaUpdate),
+    OtaResponse(OtaUpdateVersioned),
     OtaUpdateImageListRequest(), // Simple request to get all the firmware image information (id, name, desc, etc)
     OtaUpdateImageListRequestResponse(OtaImageListResponse), // Message sent to show all the avilable OTA updates
     OtaUpdateGroupListRequest(), // Simple request to get a list of all the groups with their memebers

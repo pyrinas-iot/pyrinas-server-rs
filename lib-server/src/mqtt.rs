@@ -168,19 +168,39 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
             Event::OtaResponse(update) => {
                 debug!("mqtt_run: Event::OtaResponse");
 
-                // Device id
-                let device_id = match update.uid {
-                    Some(id) => id,
-                    None => {
-                        log::warn!("No device id!");
+                // Depending on version, convert appropriately!
+                let (res, device_id) = match (update.v1, update.v2) {
+                    (None, Some(update)) => {
+                        // Device id
+                        let device_id = match update.uid {
+                            Some(id) => id,
+                            None => {
+                                log::warn!("No device id!");
+                                continue;
+                            }
+                        };
+
+                        // Get the package. Subtitute with empty one if not valid.
+                        let res = match update.package {
+                            Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
+                            None => Vec::new(),
+                        };
+
+                        (res, device_id)
+                    }
+                    (Some(update), None) => {
+                        // Get the package. Subtitute with empty one if not valid.
+                        let res = match update.package {
+                            Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
+                            None => Vec::new(),
+                        };
+
+                        (res, update.uid)
+                    }
+                    (..) => {
+                        log::warn!("Invalid OtaResponse!");
                         continue;
                     }
-                };
-
-                // Get the package. Subtitute with empty one if not valid.
-                let res = match update.package {
-                    Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
-                    None => Vec::new(),
                 };
 
                 // Generate topic

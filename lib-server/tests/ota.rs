@@ -2,9 +2,9 @@ use chrono::Utc;
 // async Related
 use flume::unbounded;
 
-use pyrinas_shared::{
-    OTAImageData, OTAImageType, OTAPackage, OTAPackageVersion, OtaRequest, OtaRequestCmd, OtaUpdate,
-};
+use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OtaUpdate};
+use pyrinas_shared::ota::{OTAPackageVersion, OtaVersion};
+use pyrinas_shared::{OtaRequest, OtaRequestCmd};
 
 use pyrinas_server::Event;
 use pyrinas_server::{ota, settings};
@@ -275,6 +275,7 @@ async fn test_ota_request_check_event_not_found() {
         device_id: "1234".to_string(),
         msg: OtaRequest {
             cmd: OtaRequestCmd::Check,
+            version: Some(OtaVersion::V2),
         },
     };
 
@@ -288,7 +289,12 @@ async fn test_ota_request_check_event_not_found() {
     match event {
         Event::OtaResponse(update) => {
             // Make sure this is ok
-            assert!(update.uid == Some("1234".to_string()));
+            assert!(update.v1.is_none());
+            assert!(update.v2.is_some());
+
+            let update = update.v2.unwrap();
+
+            assert_eq!(update.uid, Some("1234".to_string()));
             assert!(update.package.is_none());
             assert!(update.images.is_none());
         }
@@ -486,8 +492,13 @@ async fn test_ota_request_assign_an_check() {
     // Package should not be found
     match event {
         Event::OtaResponse(update) => {
+            assert!(update.v1.is_none());
+
+            // Then get the update
+            let update = update.v2.unwrap();
+
             // Make sure this is ok
-            assert!(update.uid == Some("1234".to_string()));
+            assert_eq!(update.uid, Some("1234".to_string()));
             assert!(update.package.is_some());
             assert!(update.images.is_none());
 

@@ -80,7 +80,7 @@ async fn handle_connection(
         match req.cmd {
             ManagmentDataType::AddOta => {
                 // Dedcode ota update
-                let ota_update: pyrinas_shared::OtaUpdate =
+                let ota_update: pyrinas_shared::ota::v2::OtaUpdate =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaUpdate");
 
                 // Send if decode was successful

@@ -3,7 +3,7 @@ pub mod device;
 pub mod ota;
 
 use clap::{crate_version, Clap};
-use pyrinas_shared::OtaAssociate;
+use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, io, num, path::PathBuf};
 
@@ -182,7 +182,7 @@ pub struct Show {}
 // Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OTAManifest {
-    pub version: pyrinas_shared::OTAPackageVersion,
+    pub version: OTAPackageVersion,
     pub file: String,
     pub force: bool,
 }
@@ -244,9 +244,7 @@ pub fn get_git_describe() -> Result<String, CliError> {
 //     Ok(out.to_string())
 // }
 
-pub fn get_ota_package_version(
-    ver: &str,
-) -> Result<(pyrinas_shared::OTAPackageVersion, bool), CliError> {
+pub fn get_ota_package_version(ver: &str) -> Result<(OTAPackageVersion, bool), CliError> {
     // Parse the version
     let version = Version::parse(ver)?;
 
@@ -259,7 +257,7 @@ pub fn get_ota_package_version(
     let hash: [u8; 8] = get_hash(pre[2].as_bytes().to_vec())?;
 
     Ok((
-        pyrinas_shared::OTAPackageVersion {
+        OTAPackageVersion {
             major: version.major as u8,
             minor: version.minor as u8,
             patch: version.patch as u8,
@@ -375,7 +373,7 @@ mod tests {
         // confirm the version is correct
         assert_eq!(
             package_ver,
-            pyrinas_shared::OTAPackageVersion {
+            OTAPackageVersion {
                 major: 0,
                 minor: 2,
                 patch: 1,
@@ -408,7 +406,7 @@ mod tests {
         // confirm the version is correct
         assert_eq!(
             package_ver,
-            pyrinas_shared::OTAPackageVersion {
+            OTAPackageVersion {
                 major: 0,
                 minor: 2,
                 patch: 1,

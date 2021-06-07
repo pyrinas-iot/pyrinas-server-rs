@@ -1,5 +1,9 @@
 use chrono::Utc;
-use pyrinas_shared::OTAImageData;
+
+// Pyrinas
+use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OtaUpdate};
+use pyrinas_shared::{ManagementData, ManagmentDataType};
+
 // Cbor
 use serde_cbor;
 
@@ -73,9 +77,9 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
     println!("Reading {} bytes from firmware update binary.", size);
 
     // Data structure (from pyrinas_lib_shared)
-    let new = pyrinas_shared::OtaUpdate {
+    let new = OtaUpdate {
         uid: None,
-        package: Some(pyrinas_shared::OTAPackage {
+        package: Some(OTAPackage {
             version: package_version.clone(),
             files: Vec::new(),
             date_added: Some(Utc::now()),
@@ -83,7 +87,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
         images: Some(
             [OTAImageData {
                 data: buf,
-                image_type: pyrinas_shared::OTAImageType::Primary,
+                image_type: OTAImageType::Primary,
             }]
             .to_vec(),
         ),
@@ -93,8 +97,8 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
     let data = serde_cbor::to_vec(&new)?;
 
     // Then configure the outer data
-    let msg = pyrinas_shared::ManagementData {
-        cmd: pyrinas_shared::ManagmentDataType::AddOta,
+    let msg = ManagementData {
+        cmd: ManagmentDataType::AddOta,
         target: None,
         msg: data,
     };
@@ -113,8 +117,8 @@ pub fn associate(
     associate: &OtaAssociate,
 ) -> Result<(), OtaError> {
     // Then configure the outer data
-    let msg = pyrinas_shared::ManagementData {
-        cmd: pyrinas_shared::ManagmentDataType::Associate,
+    let msg = ManagementData {
+        cmd: ManagmentDataType::Associate,
         target: None,
         msg: serde_cbor::to_vec(associate)?,
     };
@@ -131,8 +135,8 @@ pub fn associate(
 /// Adds and OTA image from an included manifest file to the server
 pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Result<(), OtaError> {
     // Then configure the outer data
-    let msg = pyrinas_shared::ManagementData {
-        cmd: pyrinas_shared::ManagmentDataType::RemoveOta,
+    let msg = ManagementData {
+        cmd: ManagmentDataType::RemoveOta,
         target: None,
         msg: image_id.as_bytes().to_vec(),
     };
@@ -148,8 +152,8 @@ pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Resu
 
 pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
     // Then configure the outer data
-    let msg = pyrinas_shared::ManagementData {
-        cmd: pyrinas_shared::ManagmentDataType::GetGroupList,
+    let msg = ManagementData {
+        cmd: ManagmentDataType::GetGroupList,
         target: None,
         msg: [].to_vec(),
     };
@@ -165,8 +169,8 @@ pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaE
 
 pub fn get_ota_image_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
     // Then configure the outer data
-    let msg = pyrinas_shared::ManagementData {
-        cmd: pyrinas_shared::ManagmentDataType::GetImageList,
+    let msg = ManagementData {
+        cmd: ManagmentDataType::GetImageList,
         target: None,
         msg: [].to_vec(),
     };
