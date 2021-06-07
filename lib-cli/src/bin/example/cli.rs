@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, Local};
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
@@ -150,7 +150,7 @@ fn main() -> anyhow::Result<()> {
                                 for (name, package) in list.images.iter() {
                                     // Get the date
                                     let date = match package.date_added {
-                                        Some(d) => d.to_string(),
+                                        Some(d) => d.with_timezone(&Local).to_string(),
                                         None => "".to_string(),
                                     };
 
