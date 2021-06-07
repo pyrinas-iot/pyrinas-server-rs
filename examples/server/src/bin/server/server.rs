@@ -12,8 +12,7 @@ use clap::{crate_version, Clap};
 // Local crate related
 use pyrinas_server::{self, settings, Event};
 
-/// This doc string acts as a help message when the user runs '--help'
-/// as do all doc strings on fields
+/// Pyrinas server
 #[derive(Clap)]
 #[clap(version = crate_version!())]
 struct Opts {

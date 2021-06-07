@@ -5,8 +5,8 @@ use pyrinas_cli::{certs, ota, CertCmd};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
 use pyrinas_shared::{OtaAssociate, OtaGroupListResponse, OtaImageListResponse};
 
-/// This doc string acts as a help message when the user runs '--help'
-/// as do all doc strings on fields
+/// Command line utility to communicate with Pyrinas server over
+/// a websockets connection.
 #[derive(Clap)]
 #[clap(version = crate_version!())]
 struct Opts {
