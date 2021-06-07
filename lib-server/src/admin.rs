@@ -1,8 +1,10 @@
+use std::convert::TryInto;
 use std::sync::Arc;
 
 // async Related
 use flume::{unbounded, Sender};
 use futures::{FutureExt, StreamExt};
+use pyrinas_shared::ota::OtaVersion;
 use tokio::sync::Mutex;
 use warp::ws::Message;
 
@@ -94,12 +96,18 @@ async fn handle_connection(
                 let a: pyrinas_shared::OtaAssociate =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaAssociate");
 
+                let ver = match a.ota_version.try_into() {
+                    Ok(v) => v,
+                    Err(_) => OtaVersion::V2,
+                };
+
                 // Send if decode was successful
                 let _ = broker_sender
                     .send_async(Event::OtaAssociate {
                         device_id: a.device_id,
                         group_id: a.group_id,
                         image_id: a.image_id,
+                        ota_version: ver,
                     })
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");

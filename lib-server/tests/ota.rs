@@ -9,6 +9,7 @@ use pyrinas_shared::{OtaRequest, OtaRequestCmd};
 use pyrinas_server::Event;
 use pyrinas_server::{ota, settings};
 
+use std::convert::TryInto;
 use std::path::Path;
 use std::sync::Once;
 
@@ -482,6 +483,7 @@ async fn test_ota_request_assign_an_check() {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
+        ota_version: 2.try_into().unwrap(),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;
@@ -613,6 +615,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
+        ota_version: 2.try_into().unwrap(),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;
@@ -692,6 +695,7 @@ async fn test_ota_request_associate_and_dissociate() {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
+        ota_version: 2.try_into().unwrap(),
     };
 
     ota::process_event(&settings, &sender, &db, &event).await;

@@ -55,6 +55,27 @@ impl fmt::Display for OTAPackage {
     }
 }
 
+impl Into<Option<super::v1::OTAPackage>> for OTAPackage {
+    fn into(self) -> Option<super::v1::OTAPackage> {
+        let image = self
+            .files
+            .iter()
+            .filter(|x| x.image_type == OTAImageType::Primary)
+            .nth(0);
+
+        // Depending if there's a primary image, organize
+        match image {
+            Some(i) => Some(super::v1::OTAPackage {
+                version: self.version.clone(),
+                host: i.host.clone(),
+                file: i.file.clone(),
+                force: false,
+            }),
+            None => None,
+        }
+    }
+}
+
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum OTAImageType {

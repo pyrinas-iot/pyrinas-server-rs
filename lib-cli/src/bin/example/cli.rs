@@ -54,6 +54,7 @@ fn main() -> anyhow::Result<()> {
                                 device_id: Some(device_id.clone()),
                                 group_id: Some(device_id),
                                 image_id: Some(image_id),
+                                ota_version: a.ota_version,
                             };
 
                             crate::ota::associate(&mut socket, &a)?;

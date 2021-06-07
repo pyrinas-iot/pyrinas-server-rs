@@ -14,7 +14,7 @@ use influxdb::{ReadQuery, WriteQuery};
 
 // Async Related
 use flume::{Receiver, Sender};
-use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned};
+use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned, OtaVersion};
 use std::sync::Arc;
 
 #[cfg(feature = "runtime_tokio")]
@@ -128,6 +128,7 @@ pub enum Event {
         device_id: Option<String>,
         group_id: Option<String>,
         image_id: Option<String>,
+        ota_version: OtaVersion,
     }, // Associate device with update
     OtaRequest {
         device_id: String,

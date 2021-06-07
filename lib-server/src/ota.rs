@@ -124,24 +124,7 @@ pub async fn process_event(
                         pyrinas_shared::ota::OtaVersion::V1 => {
                             // Get package data and transform it into a V1
                             let package: Option<ota::v1::OTAPackage> = match package {
-                                Some(p) => {
-                                    let image = p
-                                        .files
-                                        .iter()
-                                        .filter(|x| x.image_type == OTAImageType::Primary)
-                                        .nth(0);
-
-                                    // Depending if there's a primary image, organize
-                                    match image {
-                                        Some(i) => Some(ota::v1::OTAPackage {
-                                            version: p.version.clone(),
-                                            host: i.host.clone(),
-                                            file: i.file.clone(),
-                                            force: false,
-                                        }),
-                                        None => None,
-                                    }
-                                }
+                                Some(p) => p.into(),
                                 None => None,
                             };
 
@@ -205,6 +188,7 @@ pub async fn process_event(
             device_id,
             group_id,
             image_id,
+            ota_version,
         } => {
             // Match the different possiblities
             match (&device_id, &group_id, &image_id) {
@@ -278,13 +262,23 @@ pub async fn process_event(
                     }
                 };
 
-                let update = OtaUpdateVersioned {
-                    v1: None,
-                    v2: Some(OtaUpdate {
-                        uid: Some(device.to_string()),
-                        package: Some(package),
-                        images: None,
-                    }),
+                let update = match ota_version {
+                    OtaVersion::V1 => OtaUpdateVersioned {
+                        v1: None,
+                        v2: Some(OtaUpdate {
+                            uid: Some(device.to_string()),
+                            package: Some(package),
+                            images: None,
+                        }),
+                    },
+                    OtaVersion::V2 => OtaUpdateVersioned {
+                        v1: None,
+                        v2: Some(OtaUpdate {
+                            uid: Some(device.to_string()),
+                            package: Some(package),
+                            images: None,
+                        }),
+                    },
                 };
 
                 // Notify mqtt to send update!
