@@ -69,6 +69,15 @@ pub enum CliError {
         #[from]
         source: num::ParseIntError,
     },
+
+    #[error("err: {0}")]
+    CustomError(String),
+
+    #[error("ota error: {source}")]
+    OtaError {
+        #[from]
+        source: ota::OtaError,
+    },
 }
 
 /// Various commands related to the OTA process
