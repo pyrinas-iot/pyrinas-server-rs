@@ -1,9 +1,7 @@
 use anyhow::anyhow;
-use chrono::{Duration, Utc, Local};
 use clap::{crate_version, Clap};
 use pyrinas_cli::{certs, ota, CertCmd};
-use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd, OtaSubCommand};
-use pyrinas_shared::{OtaAssociate, OtaGroupListResponse, OtaImageListResponse};
+use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
 /// a websockets connection.
@@ -41,130 +39,7 @@ fn main() -> anyhow::Result<()> {
             // Get socket
             let mut socket = pyrinas_cli::get_socket(&config)?;
 
-            match c.subcmd {
-                OtaSubCommand::Add(a) => {
-                    let image_id = crate::ota::add_ota(&mut socket, a.force)?;
-
-                    println!("OTA image successfully uploaded!");
-
-                    // Do association
-                    match a.device_id {
-                        Some(device_id) => {
-                            let a = OtaAssociate {
-                                device_id: Some(device_id.clone()),
-                                group_id: Some(device_id),
-                                image_id: Some(image_id),
-                                ota_version: a.ota_version,
-                            };
-
-                            crate::ota::associate(&mut socket, &a)?;
-
-                            println!("Associated! {:?}", &a);
-                        }
-                        None => (),
-                    };
-                }
-                OtaSubCommand::Remove(r) => {
-                    crate::ota::remove_ota(&mut socket, &r.image_id)?;
-
-                    println!("{} successfully removed!", &r.image_id);
-                }
-                OtaSubCommand::Associate(a) => {
-                    crate::ota::associate(&mut socket, &a)?;
-
-                    println!("Associated! {:?}", &a);
-                }
-                OtaSubCommand::ListGroups => {
-                    crate::ota::get_ota_group_list(&mut socket)?;
-
-                    let start = Utc::now();
-
-                    // Get message
-                    loop {
-                        if Utc::now() > start + Duration::seconds(10) {
-                            eprintln!("No response from server!");
-                            break;
-                        }
-
-                        match socket.read_message() {
-                            Ok(msg) => {
-                                let data = match msg {
-                                    tungstenite::Message::Binary(b) => b,
-                                    _ => {
-                                        eprintln!("Unexpected WS message!");
-                                        break;
-                                    }
-                                };
-
-                                let list: OtaGroupListResponse = match serde_cbor::from_slice(&data)
-                                {
-                                    Ok(m) => m,
-                                    Err(e) => {
-                                        eprintln!("Unable to get image list! Error: {}", e);
-                                        break;
-                                    }
-                                };
-
-                                for name in list.groups.iter() {
-                                    // Print out the entry
-                                    println!("{}", name);
-                                }
-
-                                break;
-                            }
-                            Err(_) => continue,
-                        };
-                    }
-                }
-                OtaSubCommand::ListImages => {
-                    crate::ota::get_ota_image_list(&mut socket)?;
-
-                    let start = Utc::now();
-
-                    // Get message
-                    loop {
-                        if Utc::now() > start + Duration::seconds(10) {
-                            eprintln!("No response from server!");
-                            break;
-                        }
-
-                        match socket.read_message() {
-                            Ok(msg) => {
-                                let data = match msg {
-                                    tungstenite::Message::Binary(b) => b,
-                                    _ => {
-                                        eprintln!("Unexpected WS message!");
-                                        break;
-                                    }
-                                };
-
-                                let list: OtaImageListResponse = match serde_cbor::from_slice(&data)
-                                {
-                                    Ok(m) => m,
-                                    Err(e) => {
-                                        eprintln!("Unable to get image list! Error: {}", e);
-                                        break;
-                                    }
-                                };
-
-                                for (name, package) in list.images.iter() {
-                                    // Get the date
-                                    let date = match package.date_added {
-                                        Some(d) => d.with_timezone(&Local).to_string(),
-                                        None => "".to_string(),
-                                    };
-
-                                    // Print out the entry
-                                    println!("{} {}", name, date);
-                                }
-
-                                break;
-                            }
-                            Err(_) => continue,
-                        };
-                    }
-                }
-            };
+            crate::ota::ota_process(&mut socket, &c.subcmd)?;
         }
         SubCommand::Cert(c) => {
             // Depending on the input, create CA, server or client cert

@@ -1,8 +1,10 @@
-use chrono::Utc;
+use chrono::{Duration, Local, Utc};
 
 // Pyrinas
 use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OtaUpdate};
-use pyrinas_shared::{ManagementData, ManagmentDataType};
+use pyrinas_shared::{
+    ManagementData, ManagmentDataType, OtaGroupListResponse, OtaImageListResponse,
+};
 
 // Cbor
 use serde_cbor;
@@ -17,7 +19,7 @@ use tungstenite::{client::AutoStream, protocol::WebSocket, Message};
 // Error handling
 use thiserror::Error;
 
-use crate::OtaAssociate;
+use crate::{git, OtaAssociate, OtaSubCommand};
 
 #[derive(Debug, Error)]
 pub enum OtaError {
@@ -45,21 +47,151 @@ pub enum OtaError {
     #[error("repository is dirty. Run --force to override")]
     DirtyError,
 
-    /// Error from CLI portion of code
-    #[error("cli error: {source}")]
-    CliError {
+    /// Error for git related commands
+    #[error("{source}")]
+    GitError {
         #[from]
-        source: crate::CliError,
+        source: git::GitError,
     },
+}
+
+pub fn ota_process(
+    socket: &mut WebSocket<AutoStream>,
+    cmd: &OtaSubCommand,
+) -> Result<(), OtaError> {
+    match cmd {
+        OtaSubCommand::Add(a) => {
+            let image_id = crate::ota::add_ota(socket, a.force)?;
+
+            println!("OTA image successfully uploaded!");
+
+            // Do association
+            match &a.device_id {
+                Some(device_id) => {
+                    let a = OtaAssociate {
+                        device_id: Some(device_id.clone()),
+                        group_id: Some(device_id.to_string()),
+                        image_id: Some(image_id),
+                        ota_version: a.ota_version,
+                    };
+
+                    crate::ota::associate(socket, &a)?;
+
+                    println!("Associated! {:?}", &a);
+                }
+                None => (),
+            };
+        }
+        OtaSubCommand::Remove(r) => {
+            crate::ota::remove_ota(socket, &r.image_id)?;
+
+            println!("{} successfully removed!", &r.image_id);
+        }
+        OtaSubCommand::Associate(a) => {
+            crate::ota::associate(socket, &a)?;
+
+            println!("Associated! {:?}", &a);
+        }
+        OtaSubCommand::ListGroups => {
+            crate::ota::get_ota_group_list(socket)?;
+
+            let start = Utc::now();
+
+            // Get message
+            loop {
+                if Utc::now() > start + Duration::seconds(10) {
+                    eprintln!("No response from server!");
+                    break;
+                }
+
+                match socket.read_message() {
+                    Ok(msg) => {
+                        let data = match msg {
+                            tungstenite::Message::Binary(b) => b,
+                            _ => {
+                                eprintln!("Unexpected WS message!");
+                                break;
+                            }
+                        };
+
+                        let list: OtaGroupListResponse = match serde_cbor::from_slice(&data) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                eprintln!("Unable to get image list! Error: {}", e);
+                                break;
+                            }
+                        };
+
+                        for name in list.groups.iter() {
+                            // Print out the entry
+                            println!("{}", name);
+                        }
+
+                        break;
+                    }
+                    Err(_) => continue,
+                };
+            }
+        }
+        OtaSubCommand::ListImages => {
+            crate::ota::get_ota_image_list(socket)?;
+
+            let start = Utc::now();
+
+            // Get message
+            loop {
+                if Utc::now() > start + Duration::seconds(10) {
+                    eprintln!("No response from server!");
+                    break;
+                }
+
+                match socket.read_message() {
+                    Ok(msg) => {
+                        let data = match msg {
+                            tungstenite::Message::Binary(b) => b,
+                            _ => {
+                                eprintln!("Unexpected WS message!");
+                                break;
+                            }
+                        };
+
+                        let list: OtaImageListResponse = match serde_cbor::from_slice(&data) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                eprintln!("Unable to get image list! Error: {}", e);
+                                break;
+                            }
+                        };
+
+                        for (name, package) in list.images.iter() {
+                            // Get the date
+                            let date = match package.date_added {
+                                Some(d) => d.with_timezone(&Local).to_string(),
+                                None => "".to_string(),
+                            };
+
+                            // Print out the entry
+                            println!("{} {}", name, date);
+                        }
+
+                        break;
+                    }
+                    Err(_) => continue,
+                };
+            }
+        }
+    };
+
+    Ok(())
 }
 
 /// Adds and OTA image from an included manifest file to the server
 pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String, OtaError> {
     // Get the current version using 'git describe'
-    let ver = crate::get_git_describe()?;
+    let ver = crate::git::get_git_describe()?;
 
     // Then parse it to get OTAPackageVersion
-    let (package_version, dirty) = crate::get_ota_package_version(&ver)?;
+    let (package_version, dirty) = crate::git::get_ota_package_version(&ver)?;
 
     // Force error
     if dirty && !force {

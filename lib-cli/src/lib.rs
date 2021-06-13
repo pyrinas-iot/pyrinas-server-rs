@@ -1,15 +1,12 @@
 pub mod certs;
 pub mod device;
+pub mod git;
 pub mod ota;
 
 use clap::{crate_version, Clap};
 use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, io, num, path::PathBuf};
-
-// Getting git repo information
-use git2::{DescribeFormatOptions, DescribeOptions, Repository};
-use semver::Version;
+use std::{io, num, path::PathBuf};
 
 // Error handling
 use thiserror::Error;
@@ -24,18 +21,6 @@ pub enum CliError {
         #[from]
         source: io::Error,
     },
-
-    #[error("git error: {source}")]
-    GitError {
-        #[from]
-        source: git2::Error,
-    },
-
-    #[error("git repo not found!")]
-    GitNotFound,
-
-    #[error("unable to convert hash")]
-    HashError,
 
     #[error("toml error: {source}")]
     TomlError {
@@ -199,43 +184,6 @@ pub struct OTAManifest {
     pub force: bool,
 }
 
-pub fn get_git_describe() -> Result<String, CliError> {
-    let mut path = std::env::current_dir()?;
-
-    let repo: Repository;
-
-    // Recursively go up levels to see if there's a .git folder and then stop
-    loop {
-        repo = match Repository::open(path.clone()) {
-            Ok(repo) => repo,
-            Err(_e) => {
-                if !path.pop() {
-                    return Err(CliError::GitNotFound);
-                }
-
-                continue;
-            }
-        };
-
-        break;
-    }
-
-    // Describe options
-    let mut opts = DescribeOptions::new();
-    let opts = opts.describe_all().describe_tags();
-
-    // Describe format
-    let mut desc_format_opts = DescribeFormatOptions::new();
-    desc_format_opts
-        .always_use_long_format(true)
-        .dirty_suffix("-dirty");
-
-    // Describe string!
-    let des = repo.describe(&opts)?.format(Some(&desc_format_opts))?;
-
-    Ok(des)
-}
-
 // pub fn get_git_describe() -> Result<String, OtaError> {
 //     // Expected output 0.2.1-19-g09db6ef-dirty
 
@@ -255,37 +203,6 @@ pub fn get_git_describe() -> Result<String, CliError> {
 //     // Convert it to String
 //     Ok(out.to_string())
 // }
-
-pub fn get_ota_package_version(ver: &str) -> Result<(OTAPackageVersion, bool), CliError> {
-    // Parse the version
-    let version = Version::parse(ver)?;
-
-    log::info!("ver: {:?}", version);
-
-    // Then convert it to an OTAPackageVersion
-    let dirty = ver.contains("dirty");
-    let pre: Vec<&str> = ver.split('-').collect();
-    let commit: u8 = pre[1].parse()?;
-    let hash: [u8; 8] = get_hash(pre[2].as_bytes().to_vec())?;
-
-    Ok((
-        OTAPackageVersion {
-            major: version.major as u8,
-            minor: version.minor as u8,
-            patch: version.patch as u8,
-            commit: commit,
-            hash: hash,
-        },
-        dirty,
-    ))
-}
-
-fn get_hash(v: Vec<u8>) -> Result<[u8; 8], CliError> {
-    match v.try_into() {
-        Ok(r) => Ok(r),
-        Err(_e) => Err(CliError::HashError),
-    }
-}
 
 pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
     // String of full URL
@@ -372,7 +289,7 @@ mod tests {
 
         let ver = "0.2.1-19-g09db6ef-dirty";
 
-        let res = get_ota_package_version(ver);
+        let res = git::get_ota_package_version(ver);
 
         // Make sure it processed ok
         assert!(res.is_ok());
@@ -405,7 +322,7 @@ mod tests {
 
         let ver = "0.2.1-19-g09db6ef";
 
-        let res = get_ota_package_version(ver);
+        let res = git::get_ota_package_version(ver);
 
         // Make sure it processed ok
         assert!(res.is_ok());
@@ -438,7 +355,7 @@ mod tests {
 
         let ver = "0.2.1-g09db6ef-dirty";
 
-        let res = get_ota_package_version(ver);
+        let res = git::get_ota_package_version(ver);
 
         // Make sure it processed ok
         assert!(res.is_err());
@@ -449,7 +366,7 @@ mod tests {
         // Log setup
         setup();
 
-        let res = get_git_describe();
+        let res = git::get_git_describe();
 
         // Make sure it processed ok
         assert!(res.is_ok());
