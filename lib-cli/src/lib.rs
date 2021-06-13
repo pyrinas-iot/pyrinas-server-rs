@@ -7,7 +7,7 @@ pub mod ota;
 use clap::{crate_version, Clap};
 use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
 use serde::{Deserialize, Serialize};
-use std::{io, num};
+use std::num;
 
 // Error handling
 use thiserror::Error;
@@ -17,18 +17,6 @@ use tungstenite::{client::AutoStream, http, http::Request, protocol::WebSocket};
 
 #[derive(Debug, Error)]
 pub enum CliError {
-    #[error("filesystem error: {source}")]
-    FileError {
-        #[from]
-        source: io::Error,
-    },
-
-    #[error("toml error: {source}")]
-    TomlError {
-        #[from]
-        source: toml::de::Error,
-    },
-
     #[error("{source}")]
     ConfigError {
         #[from]
@@ -230,42 +218,6 @@ pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
 
     // Return this guy
     Ok(socket)
-}
-
-/// Fetch the configuration from the provided folder path
-pub fn get_config() -> Result<Config, CliError> {
-    // Get config path
-    let mut path = config::get_config_path()?;
-
-    // Add file to path
-    path.push("config.toml");
-
-    // Read file to end
-    let config = std::fs::read_to_string(path)?;
-
-    // Deserialize
-    let config: Config = toml::from_str(&config)?;
-    Ok(config)
-}
-
-/// Set config
-pub fn set_config(init: &Config) -> Result<(), CliError> {
-    // Get config path
-    let mut path = config::get_config_path()?;
-
-    // Create the config path
-    std::fs::create_dir_all(&path)?;
-
-    // Add file to path
-    path.push("config.toml");
-
-    // With init data create config.toml
-    let config_string = toml::to_string(&init).unwrap();
-
-    // Save config toml
-    std::fs::write(path, config_string)?;
-
-    Ok(())
 }
 
 #[cfg(test)]

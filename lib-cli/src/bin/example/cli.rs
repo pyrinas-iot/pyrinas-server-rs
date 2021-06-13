@@ -1,6 +1,6 @@
 use clap::{crate_version, Clap};
 use pyrinas_cli::{ota, CertCmd, CliError};
-use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
+use pyrinas_cli::{ConfigCmd, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
 /// a websockets connection.
@@ -27,7 +27,7 @@ fn main() -> Result<(), CliError> {
     env_logger::init();
 
     // Get config
-    let config = match pyrinas_cli::get_config() {
+    let config = match pyrinas_cli::config::get_config() {
         Ok(c) => c,
         Err(_e) => {
             return Err(CliError::CustomError(
@@ -48,24 +48,7 @@ fn main() -> Result<(), CliError> {
         // Depending on the input, create CA, server or client cert
         SubCommand::Cert(c) => pyrinas_cli::certs::process(&config, &c)?,
         // Process config commands
-        SubCommand::Config(c) => {
-            match c.subcmd {
-                ConfigSubCommand::Show(_) => {
-                    println!("{:?}", config);
-                }
-                ConfigSubCommand::Init => {
-                    // Default config (blank)
-                    let c = Default::default();
-
-                    // TODO: migrate config on update..
-
-                    // Set the config from init struct
-                    pyrinas_cli::set_config(&c)?;
-
-                    println!("Config successfully added!");
-                }
-            }
-        }
+        SubCommand::Config(c) => pyrinas_cli::config::process(&config, &c)?,
     }
 
     Ok(())
