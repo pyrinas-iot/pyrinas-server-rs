@@ -8,7 +8,7 @@ use rcgen::{
 use std::{convert::TryInto, fs, io};
 use thiserror::Error;
 
-use crate::{config::ConfigError, CertConfig};
+use crate::{config::ConfigError, CertCmd, CertConfig, CertSubcommand};
 
 #[derive(Debug, Error)]
 pub enum CertsError {
@@ -69,6 +69,23 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     params.use_authority_key_identifier_extension = true;
 
     params
+}
+
+/// Function used to process all incoming certification generation commands
+pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), CertsError> {
+    match &c.subcmd {
+        CertSubcommand::Ca => {
+            generate_ca_cert(&config.cert)?;
+        }
+        CertSubcommand::Server => {
+            generate_server_cert(&config.cert)?;
+        }
+        CertSubcommand::Device { id } => {
+            generate_device_cert(&config.cert, &id)?;
+        }
+    };
+
+    Ok(())
 }
 
 pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {

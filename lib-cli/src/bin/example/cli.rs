@@ -1,5 +1,5 @@
 use clap::{crate_version, Clap};
-use pyrinas_cli::{certs, ota, CertCmd, CliError};
+use pyrinas_cli::{ota, CertCmd, CliError};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
@@ -29,7 +29,7 @@ fn main() -> Result<(), CliError> {
     // Get config
     let config = match pyrinas_cli::get_config() {
         Ok(c) => c,
-        Err(e) => {
+        Err(_e) => {
             return Err(CliError::CustomError(
                 "Unable to get config. Run \"init\" command before you continue.".to_string(),
             ))
@@ -38,26 +38,16 @@ fn main() -> Result<(), CliError> {
 
     // Process command.
     match opts.subcmd {
+        // Process OTA commands (needs to be connected)
         SubCommand::Ota(c) => {
             // Get socket
             let mut socket = pyrinas_cli::get_socket(&config)?;
 
-            crate::ota::ota_process(&mut socket, &c.subcmd)?;
+            crate::ota::process(&mut socket, &c.subcmd)?;
         }
-        SubCommand::Cert(c) => {
-            // Depending on the input, create CA, server or client cert
-            match c.subcmd {
-                pyrinas_cli::CertSubcommand::Ca => {
-                    certs::generate_ca_cert(&config.cert)?;
-                }
-                pyrinas_cli::CertSubcommand::Server => {
-                    certs::generate_server_cert(&config.cert)?;
-                }
-                pyrinas_cli::CertSubcommand::Device { id } => {
-                    certs::generate_device_cert(&config.cert, &id)?;
-                }
-            }
-        }
+        // Depending on the input, create CA, server or client cert
+        SubCommand::Cert(c) => pyrinas_cli::certs::process(&config, &c)?,
+        // Process config commands
         SubCommand::Config(c) => {
             match c.subcmd {
                 ConfigSubCommand::Show(_) => {

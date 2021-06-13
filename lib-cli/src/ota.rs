@@ -55,10 +55,8 @@ pub enum OtaError {
     },
 }
 
-pub fn ota_process(
-    socket: &mut WebSocket<AutoStream>,
-    cmd: &OtaSubCommand,
-) -> Result<(), OtaError> {
+/// Functon for processing all incoming OTA commands.
+pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Result<(), OtaError> {
     match cmd {
         OtaSubCommand::Add(a) => {
             let image_id = crate::ota::add_ota(socket, a.force)?;
