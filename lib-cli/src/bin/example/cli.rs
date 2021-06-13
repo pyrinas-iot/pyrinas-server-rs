@@ -1,6 +1,5 @@
-use anyhow::anyhow;
 use clap::{crate_version, Clap};
-use pyrinas_cli::{certs, ota, CertCmd};
+use pyrinas_cli::{certs, ota, CertCmd, CliError};
 use pyrinas_cli::{ConfigCmd, ConfigSubCommand, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
@@ -20,7 +19,7 @@ enum SubCommand {
     Cert(CertCmd),
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), CliError> {
     // Opts from CLI
     let opts: Opts = Opts::parse();
 
@@ -30,7 +29,11 @@ fn main() -> anyhow::Result<()> {
     // Get config
     let config = match pyrinas_cli::get_config() {
         Ok(c) => c,
-        Err(e) => return Err(anyhow!("Unable to get config. Error: {}", e)),
+        Err(e) => {
+            return Err(CliError::CustomError(
+                "Unable to get config. Run \"init\" command before you continue.".to_string(),
+            ))
+        }
     };
 
     // Process command.
@@ -67,9 +70,7 @@ fn main() -> anyhow::Result<()> {
                     // TODO: migrate config on update..
 
                     // Set the config from init struct
-                    if let Err(e) = pyrinas_cli::set_config(&c) {
-                        return Err(anyhow!("Unable to set config. Err: {}", e));
-                    };
+                    pyrinas_cli::set_config(&c)?;
 
                     println!("Config successfully added!");
                 }

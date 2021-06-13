@@ -8,7 +8,7 @@ use rcgen::{
 use std::{convert::TryInto, fs, io};
 use thiserror::Error;
 
-use crate::CertConfig;
+use crate::{config::ConfigError, CertConfig};
 
 #[derive(Debug, Error)]
 pub enum CertsError {
@@ -37,11 +37,10 @@ pub enum CertsError {
         source: serde_json::Error,
     },
 
-    /// Error from CLI portion of code
     #[error("{source}")]
-    CliError {
+    ConfigError {
         #[from]
-        source: crate::CliError,
+        source: ConfigError,
     },
 }
 
@@ -73,7 +72,9 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
 }
 
 pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Get the path
     let ca_der_path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
@@ -92,10 +93,7 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
     params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
 
     // Set the key usage
-    params.key_usages = vec![
-        KeyUsagePurpose::CrlSign,
-        KeyUsagePurpose::KeyCertSign,
-    ];
+    params.key_usages = vec![KeyUsagePurpose::CrlSign, KeyUsagePurpose::KeyCertSign];
 
     // Set this to 10 years instead of default 4
     params.not_after = params
@@ -124,7 +122,9 @@ fn write_device_json(
     ca_cert: &Certificate,
     ca_der: &Vec<u8>,
 ) -> Result<(), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Serialize output
     let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
@@ -169,7 +169,9 @@ pub fn write_keypair_pem(
     cert: &Certificate,
     ca_cert: &Certificate,
 ) -> Result<(), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Serialize output
     let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
@@ -205,7 +207,9 @@ fn write_pfx(
     ca_der: &Vec<u8>,
 ) -> Result<(), CertsError> {
     // Config path
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Path to pfx
     let ca_pfx_path = format!(
@@ -241,7 +245,9 @@ fn write_pfx(
 }
 
 pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Load CA
     let path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
@@ -267,7 +273,9 @@ pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>),
 }
 
 pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
     let name = "server".to_string();
 
     let server_cert_path = format!(
@@ -315,7 +323,9 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
 }
 
 pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result<(), CertsError> {
-    let config_path = crate::get_config_path()?.to_string_lossy().to_string();
+    let config_path = crate::config::get_config_path()?
+        .to_string_lossy()
+        .to_string();
 
     let device_cert_path = format!(
         "{}/certs/{}/{}/{}.pem",
@@ -336,9 +346,7 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
     let mut params: CertificateParams = get_default_params(config);
 
     // Set the key usage
-    params.key_usages = vec![
-        KeyUsagePurpose::DigitalSignature,
-    ];
+    params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
 
     // Set the ext key useage
     params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
@@ -359,7 +367,10 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
     // Write nRF Connect Desktop compatable JSON for cert install
     write_device_json(&config, &name, &cert, &ca_cert, &ca_der)?;
 
-    println!("Exported cert for {} to {}/{}", name, config_path, config.domain);
+    println!(
+        "Exported cert for {} to {}/{}",
+        name, config_path, config.domain
+    );
 
     Ok(())
 }

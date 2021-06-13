@@ -1,4 +1,5 @@
 pub mod certs;
+pub mod config;
 pub mod device;
 pub mod git;
 pub mod ota;
@@ -6,7 +7,7 @@ pub mod ota;
 use clap::{crate_version, Clap};
 use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
 use serde::{Deserialize, Serialize};
-use std::{io, num, path::PathBuf};
+use std::{io, num};
 
 // Error handling
 use thiserror::Error;
@@ -28,8 +29,11 @@ pub enum CliError {
         source: toml::de::Error,
     },
 
-    #[error("unable to get home path")]
-    HomeError,
+    #[error("{source}")]
+    ConfigError {
+        #[from]
+        source: config::ConfigError,
+    },
 
     #[error("http error: {source}")]
     HttpError {
@@ -62,6 +66,12 @@ pub enum CliError {
     OtaError {
         #[from]
         source: ota::OtaError,
+    },
+
+    #[error("{source}")]
+    CertsError {
+        #[from]
+        source: certs::CertsError,
     },
 }
 
@@ -225,7 +235,7 @@ pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
 /// Fetch the configuration from the provided folder path
 pub fn get_config() -> Result<Config, CliError> {
     // Get config path
-    let mut path = get_config_path()?;
+    let mut path = config::get_config_path()?;
 
     // Add file to path
     path.push("config.toml");
@@ -241,7 +251,7 @@ pub fn get_config() -> Result<Config, CliError> {
 /// Set config
 pub fn set_config(init: &Config) -> Result<(), CliError> {
     // Get config path
-    let mut path = get_config_path()?;
+    let mut path = config::get_config_path()?;
 
     // Create the config path
     std::fs::create_dir_all(&path)?;
@@ -256,17 +266,6 @@ pub fn set_config(init: &Config) -> Result<(), CliError> {
     std::fs::write(path, config_string)?;
 
     Ok(())
-}
-
-pub fn get_config_path() -> Result<PathBuf, CliError> {
-    // Get the config file from standard location
-    let mut config_path = home::home_dir().ok_or(CliError::HomeError)?;
-
-    // Append config path to home directory
-    config_path.push(".pyrinas");
-
-    // Return it
-    Ok(config_path)
 }
 
 #[cfg(test)]
