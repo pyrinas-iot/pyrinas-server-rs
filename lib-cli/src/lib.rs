@@ -16,11 +16,11 @@ use thiserror::Error;
 use tungstenite::{client::AutoStream, http, http::Request, protocol::WebSocket};
 
 #[derive(Debug, Error)]
-pub enum CliError {
+pub enum Error {
     #[error("{source}")]
-    ConfigError {
+    Error {
         #[from]
-        source: config::ConfigError,
+        source: config::Error,
     },
 
     #[error("http error: {source}")]
@@ -53,13 +53,13 @@ pub enum CliError {
     #[error("ota error: {source}")]
     OtaError {
         #[from]
-        source: ota::OtaError,
+        source: ota::Error,
     },
 
     #[error("{source}")]
     CertsError {
         #[from]
-        source: certs::CertsError,
+        source: certs::Error,
     },
 }
 
@@ -184,7 +184,7 @@ pub struct OTAManifest {
     pub force: bool,
 }
 
-// pub fn get_git_describe() -> Result<String, OtaError> {
+// pub fn get_git_describe() -> Result<String, Error> {
 //     // Expected output 0.2.1-19-g09db6ef-dirty
 
 //     // Get git describe output
@@ -204,9 +204,9 @@ pub struct OTAManifest {
 //     Ok(out.to_string())
 // }
 
-pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
+pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, Error> {
     if !config.secure {
-        log::warn!("Not using secure WSS connection!");
+        println!("WARNING! Not using secure web socket connection!");
     }
 
     // String of full URL

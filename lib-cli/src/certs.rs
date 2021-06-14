@@ -8,10 +8,10 @@ use rcgen::{
 use std::{convert::TryInto, fs, io};
 use thiserror::Error;
 
-use crate::{config::ConfigError, CertCmd, CertConfig, CertSubcommand};
+use crate::{config, ota, CertCmd, CertConfig, CertSubcommand};
 
 #[derive(Debug, Error)]
-pub enum CertsError {
+pub enum Error {
     #[error("{source}")]
     FileError {
         #[from]
@@ -40,7 +40,13 @@ pub enum CertsError {
     #[error("{source}")]
     ConfigError {
         #[from]
-        source: ConfigError,
+        source: config::Error,
+    },
+
+    #[error("{source}")]
+    OtaError {
+        #[from]
+        source: ota::Error,
     },
 }
 
@@ -72,7 +78,7 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
 }
 
 /// Function used to process all incoming certification generation commands
-pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), CertsError> {
+pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
     match &c.subcmd {
         CertSubcommand::Ca => {
             generate_ca_cert(&config.cert)?;
@@ -88,7 +94,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), CertsError> {
     Ok(())
 }
 
-pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
+pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -99,7 +105,7 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
 
     // Check if CA exits
     if std::path::Path::new(&ca_der_path).exists() {
-        return Err(CertsError::AlreadyExists {
+        return Err(Error::AlreadyExists {
             name: "ca".to_string(),
         });
     }
@@ -138,7 +144,7 @@ fn write_device_json(
     cert: &Certificate,
     ca_cert: &Certificate,
     ca_der: &Vec<u8>,
-) -> Result<(), CertsError> {
+) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -185,7 +191,7 @@ pub fn write_keypair_pem(
     name: &String,
     cert: &Certificate,
     ca_cert: &Certificate,
-) -> Result<(), CertsError> {
+) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -222,7 +228,7 @@ fn write_pfx(
     cert: &Certificate,
     ca_cert: &Certificate,
     ca_der: &Vec<u8>,
-) -> Result<(), CertsError> {
+) -> Result<(), Error> {
     // Config path
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
@@ -236,7 +242,7 @@ fn write_pfx(
 
     // Check if it exists
     if std::path::Path::new(&ca_pfx_path).exists() {
-        return Err(CertsError::AlreadyExists {
+        return Err(Error::AlreadyExists {
             name: name.to_string(),
         });
     }
@@ -251,7 +257,7 @@ fn write_pfx(
 
     // Generate pfx file!
     let ca_pfx = PFX::new(&cert_der, &key_der, Some(&ca_der), &config.pfx_pass, &name)
-        .ok_or(CertsError::PfxGen)?
+        .ok_or(Error::PfxGen)?
         .to_der()
         .to_vec();
 
@@ -261,7 +267,7 @@ fn write_pfx(
     Ok(())
 }
 
-pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>), CertsError> {
+pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -289,7 +295,7 @@ pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>),
     Ok((Certificate::from_params(ca_cert_params)?, ca_cert_der))
 }
 
-pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError> {
+pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -302,7 +308,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
 
     // Check if it exists
     if std::path::Path::new(&server_cert_path).exists() {
-        return Err(CertsError::AlreadyExists {
+        return Err(Error::AlreadyExists {
             name: name.to_string(),
         });
     }
@@ -339,7 +345,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), CertsError
     Ok(())
 }
 
-pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result<(), CertsError> {
+pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -351,7 +357,7 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
 
     // Check if it exists
     if std::path::Path::new(&device_cert_path).exists() {
-        return Err(CertsError::AlreadyExists {
+        return Err(Error::AlreadyExists {
             name: name.to_string(),
         });
     }

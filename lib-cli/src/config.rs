@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{Config, ConfigCmd, ConfigSubCommand};
 
 #[derive(Debug, Error)]
-pub enum ConfigError {
+pub enum Error {
     #[error("unable to get home path")]
     HomeError,
 
@@ -22,9 +22,9 @@ pub enum ConfigError {
     },
 }
 
-pub fn get_config_path() -> Result<PathBuf, ConfigError> {
+pub fn get_config_path() -> Result<PathBuf, Error> {
     // Get the config file from standard location
-    let mut config_path = home::home_dir().ok_or(ConfigError::HomeError)?;
+    let mut config_path = home::home_dir().ok_or(Error::HomeError)?;
 
     // Append config path to home directory
     config_path.push(".pyrinas");
@@ -34,7 +34,7 @@ pub fn get_config_path() -> Result<PathBuf, ConfigError> {
 }
 
 /// Set config
-pub fn set_config(init: &Config) -> Result<(), ConfigError> {
+pub fn set_config(init: &Config) -> Result<(), Error> {
     // Get config path
     let mut path = get_config_path()?;
 
@@ -54,7 +54,7 @@ pub fn set_config(init: &Config) -> Result<(), ConfigError> {
 }
 
 /// Fetch the configuration from the provided folder path
-pub fn get_config() -> Result<Config, ConfigError> {
+pub fn get_config() -> Result<Config, Error> {
     // Get config path
     let mut path = get_config_path()?;
 
@@ -69,7 +69,7 @@ pub fn get_config() -> Result<Config, ConfigError> {
     Ok(config)
 }
 
-pub fn process(config: &Config, c: &ConfigCmd) -> Result<(), ConfigError> {
+pub fn process(config: &Config, c: &ConfigCmd) -> Result<(), Error> {
     match c.subcmd {
         ConfigSubCommand::Show(_) => {
             println!("{:?}", config);

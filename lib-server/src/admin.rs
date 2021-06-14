@@ -200,6 +200,13 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> an
                         continue;
                     }
                 },
+                Event::ApplicationManagementResponse(r) => match serde_cbor::to_vec(&r) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        log::warn!("Unable to application management response!");
+                        continue;
+                    }
+                },
                 _ => {
                     log::warn!("Unhandled command sent to admin!");
                     continue;

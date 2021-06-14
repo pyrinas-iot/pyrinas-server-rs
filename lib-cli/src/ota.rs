@@ -22,7 +22,7 @@ use thiserror::Error;
 use crate::{git, OtaAssociate, OtaSubCommand};
 
 #[derive(Debug, Error)]
-pub enum OtaError {
+pub enum Error {
     #[error("file error: {source}")]
     FileError {
         #[from]
@@ -56,7 +56,7 @@ pub enum OtaError {
 }
 
 /// Functon for processing all incoming OTA commands.
-pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Result<(), OtaError> {
+pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Result<(), Error> {
     match cmd {
         OtaSubCommand::Add(a) => {
             let image_id = crate::ota::add_ota(socket, a.force)?;
@@ -184,7 +184,7 @@ pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Resul
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String, OtaError> {
+pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String, Error> {
     // Get the current version using 'git describe'
     let ver = crate::git::get_git_describe()?;
 
@@ -193,7 +193,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
 
     // Force error
     if dirty && !force {
-        return Err(OtaError::DirtyError);
+        return Err(Error::DirtyError);
     }
 
     // Path for ota
@@ -245,7 +245,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
 pub fn associate(
     stream: &mut WebSocket<AutoStream>,
     associate: &OtaAssociate,
-) -> Result<(), OtaError> {
+) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::Associate,
@@ -263,7 +263,7 @@ pub fn associate(
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Result<(), OtaError> {
+pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::RemoveOta,
@@ -280,7 +280,7 @@ pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Resu
     Ok(())
 }
 
-pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
+pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::GetGroupList,
@@ -297,7 +297,7 @@ pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaE
     Ok(())
 }
 
-pub fn get_ota_image_list(stream: &mut WebSocket<AutoStream>) -> Result<(), OtaError> {
+pub fn get_ota_image_list(stream: &mut WebSocket<AutoStream>) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::GetImageList,
