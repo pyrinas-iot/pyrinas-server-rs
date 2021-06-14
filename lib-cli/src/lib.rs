@@ -147,6 +147,8 @@ pub struct Config {
     /// URL of the Pyrinas server to connect to.
     /// For example: pyrinas-admin.yourdomain.com
     pub url: String,
+    /// Determines secure connection or not
+    pub secure: bool,
     /// Authentication key. This is the same key set in
     /// the Pyrinas config.toml
     pub authkey: String,
@@ -203,8 +205,19 @@ pub struct OTAManifest {
 // }
 
 pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, CliError> {
+    if !config.secure {
+        log::warn!("Not using secure WSS connection!");
+    }
+
     // String of full URL
-    let full_uri = format!("wss://{}/socket", config.url);
+    let full_uri = format!(
+        "ws{}://{}/socket",
+        match config.secure {
+            true => "s",
+            false => "",
+        },
+        config.url
+    );
 
     // Set up handshake request
     let req = Request::builder()
