@@ -1,5 +1,5 @@
 use clap::{crate_version, Clap};
-use pyrinas_cli::{ota, CertCmd, CliError};
+use pyrinas_cli::{ota, CertCmd, Error};
 use pyrinas_cli::{ConfigCmd, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
@@ -19,7 +19,7 @@ enum SubCommand {
     Cert(CertCmd),
 }
 
-fn main() -> Result<(), CliError> {
+fn main() -> Result<(), Error> {
     // Opts from CLI
     let opts: Opts = Opts::parse();
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), CliError> {
     let config = match pyrinas_cli::config::get_config() {
         Ok(c) => c,
         Err(_e) => {
-            return Err(CliError::CustomError(
+            return Err(Error::CustomError(
                 "Unable to get config. Run \"init\" command before you continue.".to_string(),
             ))
         }
