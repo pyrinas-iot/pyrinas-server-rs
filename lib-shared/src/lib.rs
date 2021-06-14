@@ -8,6 +8,7 @@ use clap::{crate_version, Clap};
 
 // Modules
 pub mod ota;
+pub mod settings;
 
 // Default version
 pub const DEFAULT_OTA_VERSION: &str = "2";

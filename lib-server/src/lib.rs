@@ -4,7 +4,6 @@ pub mod broker;
 pub mod influx;
 pub mod mqtt;
 pub mod ota;
-pub mod settings;
 pub mod telemetry;
 
 pub use pyrinas_shared::*;

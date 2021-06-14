@@ -22,9 +22,8 @@ cfg_if::cfg_if! {
 }
 
 // Local lib related
-use crate::settings;
 use crate::Event;
-use pyrinas_shared::ManagmentDataType;
+use pyrinas_shared::{settings, ManagmentDataType};
 
 // Cbor
 use serde_cbor;
