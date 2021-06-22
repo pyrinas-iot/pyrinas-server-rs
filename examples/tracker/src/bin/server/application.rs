@@ -5,6 +5,7 @@ use pyrinas_server::{settings::PyrinasSettings, Event};
 // async Related
 use flume::{unbounded, Sender};
 // use std::str;
+use std::str;
 use std::sync::Arc;
 
 pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) {
@@ -56,41 +57,63 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                         log::info!("deserialized data: {:?}", payload);
 
                         // Pubish GPS to Influx
-                        match payload.gps {
-                            Some(r) => {
-                                let query = r.to_influx(&req.uid).into_query("gps");
+                        if let Some(r) = payload.gps {
+                            let query = r.to_influx(&req.uid).into_query("gps");
 
-                                // Send the query
-                                if let Err(e) = broker_sender
-                                    .send_async(pyrinas_server::Event::InfluxDataSave(query))
-                                    .await
-                                {
-                                    log::error!("Unable to publish query to Influx! {:?}", e);
-                                }
+                            // Send the query
+                            if let Err(e) = broker_sender
+                                .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                                .await
+                            {
+                                log::error!("Unable to publish query to Influx! {:?}", e);
                             }
-                            None => {}
                         };
 
                         // Publish Cellular Data to Influx
-                        match payload.roam {
-                            Some(r) => {
-                                let query = r.to_influx(&req.uid).into_query("roam");
+                        if let Some(r) = payload.roam {
+                            let query = r.to_influx(&req.uid).into_query("roam");
 
-                                // Send the query
-                                if let Err(e) = broker_sender
-                                    .send_async(pyrinas_server::Event::InfluxDataSave(query))
-                                    .await
-                                {
-                                    log::error!("Unable to publish query to Influx! {:?}", e);
-                                }
+                            // Send the query
+                            if let Err(e) = broker_sender
+                                .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                                .await
+                            {
+                                log::error!("Unable to publish query to Influx! {:?}", e);
                             }
-                            None => {}
                         };
 
                         // Publish Battery Data to Influx
-                        match payload.bat {
-                            Some(r) => {
-                                let query = r.to_influx(&req.uid).into_query("batt");
+                        if let Some(r) = payload.bat {
+                            let query = r.to_influx(&req.uid).into_query("batt");
+
+                            // Send the query
+                            if let Err(e) = broker_sender
+                                .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                                .await
+                            {
+                                log::error!("Unable to publish query to Influx! {:?}", e);
+                            }
+                        };
+                    }
+                    /* TODO: decode other entries besides accel */
+                    "batch" => match str::from_utf8(&req.msg) {
+                        // TrackerBulkReport
+                        Ok(m) => {
+                            log::info!("batch: {}", m);
+
+                            // Handle deserialization of JSON from Asset Tracker V2
+                            let payload: crate::structures::data::TrackerBulkReport =
+                                match serde_json::from_slice(&req.msg) {
+                                    Ok(p) => p,
+                                    Err(e) => {
+                                        log::error!("Unable to deserialize data! Err: {}", e);
+                                        continue;
+                                    }
+                                };
+
+                            // Submit each
+                            for val in payload.acc {
+                                let query = val.to_influx(&req.uid).into_query("accel");
 
                                 // Send the query
                                 if let Err(e) = broker_sender
@@ -100,9 +123,9 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                                     log::error!("Unable to publish query to Influx! {:?}", e);
                                 }
                             }
-                            None => {}
-                        };
-                    }
+                        }
+                        Err(e) => log::error!("Error: {}", e),
+                    },
                     "env" => {
                         // TODO: handle deserialization of JSON from Asset Tracker V2
                     }

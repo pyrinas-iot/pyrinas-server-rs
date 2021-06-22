@@ -33,3 +33,13 @@ pub struct TrackerBattInfluxReport {
     pub id: String,
     pub val: u32,
 }
+
+#[derive(Debug, InfluxDbWriteable, Clone)]
+pub struct TrackerAccelInfluxReport {
+    pub time: DateTime<Utc>,
+    #[influxdb(tag)]
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}

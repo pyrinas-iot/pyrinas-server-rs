@@ -113,6 +113,41 @@ impl TrackerBatteryReport {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrackerAccelData {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrackerAccelReport {
+    pub v: TrackerAccelData,
+    #[serde(deserialize_with = "from_ts")]
+    pub ts: DateTime<Utc>,
+}
+
+impl TrackerAccelReport {
+    pub fn to_influx(&self, id: &String) -> influx::TrackerAccelInfluxReport {
+        // Return new data structure that's friendly with Influx
+        let report = influx::TrackerAccelInfluxReport {
+            time: self.ts,
+            id: id.clone(),
+            x: self.v.x,
+            y: self.v.y,
+            z: self.v.z,
+        };
+
+        // Return the influx equivalent
+        report
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrackerBulkReport {
+    pub acc: Vec<TrackerAccelReport>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TrackerStateReport {
     pub bat: Option<TrackerBatteryReport>,
     pub dev: Option<TrackerDeviceReport>,
