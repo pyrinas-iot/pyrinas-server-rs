@@ -61,7 +61,7 @@ pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Resul
         OtaSubCommand::Add(a) => {
             let image_id = crate::ota::add_ota(socket, a.force)?;
 
-            println!("OTA image successfully uploaded!");
+            println!("{} image successfully uploaded!", &image_id);
 
             // Do association
             match &a.device_id {

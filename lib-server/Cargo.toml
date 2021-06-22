@@ -17,11 +17,11 @@ runtime_async_std = ["async-std", "async-macros"]
 [dependencies]
 clap = "3.0.0-beta.2" # CLI Library
 env_logger = "0.8" # logging message control using env variable
-influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
+influxdb = { version="0.4", features=["derive"] } # InfluxDB access 
 log = "0.4" # logging messages
-pyrinas-shared = { version = "0.2", path = "../lib-shared/" } # Local shared for settings, etc 
-rumqttd = { git = "https://github.com/jaredwolff/rumqtt", branch = "adding-server-login-credential-check", default-features = false, features = ["use-native-tls"] } # Mqtt core bits
-serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
+pyrinas-shared = { path="../lib-shared/" } # Local shared for settings, etc 
+rumqttd = { git="https://github.com/jaredwolff/rumqtt", branch="adding-server-login-credential-check", default-features=false, features=["use-native-tls"] } # Mqtt core bits
+serde = { version="1.0", features=["derive"] } # Serializing/deserializing 
 serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
 serde_json = "1.0" # Serializing/deserializing json
 sled = "0.34" # Storing events as KV store
@@ -33,9 +33,9 @@ toml = "0.5.8" # for config purposes
 chrono = "0.4" # for time
 
 # Optional features
-tokio = { version = "1.0", default-features = false, features = ["net", "rt", "macros", "io-util"], optional = true } # async runtime
-async-std = { version = "1.9.0", optional = true, default-features = false } # async runtime
-async-macros = { version = "2.0.0", optional = true } # async-std runtime macros
-tokio-stream = { version = "0.1", features = ["net"], optional = true } # tokio stream (removed from mainline tokio until future)
-warp = { version = "0.3", optional = true } # Webserver for hosting OTA files
-tokio-compat-02 = { version = "0.2.0", optional = true }
+tokio = { version="1.0", default-features=false, features=["net", "rt", "macros", "io-util"], optional=true } # async runtime
+async-std = { version="1.9.0", optional=true, default-features=false } # async runtime
+async-macros = { version="2.0.0", optional=true } # async-std runtime macros
+tokio-stream = { version="0.1", features=["net"], optional=true } # tokio stream (removed from mainline tokio until future)
+warp = { version="0.3", optional=true } # Webserver for hosting OTA files
+tokio-compat-02 = { version="0.2.0", optional=true }
