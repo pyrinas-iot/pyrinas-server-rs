@@ -4,7 +4,6 @@ use std::sync::Arc;
 // async Related
 use flume::{unbounded, Sender};
 use futures::{FutureExt, StreamExt};
-use pyrinas_shared::ota::OtaVersion;
 use tokio::sync::Mutex;
 use warp::ws::Message;
 
@@ -22,8 +21,9 @@ cfg_if::cfg_if! {
 }
 
 // Local lib related
+use crate::settings;
 use crate::Event;
-use pyrinas_shared::{settings, ManagmentDataType};
+use pyrinas_shared::{ota::OtaVersion, ManagmentDataType};
 
 // Cbor
 use serde_cbor;

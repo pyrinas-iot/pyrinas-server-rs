@@ -18,4 +18,3 @@ clap = "3.0.0-beta.2" # CLI Library
 chrono = { version="0.4", features=["serde"] }
 anyhow = "1.0" # Generic error
 toml = "0.5.8" # for config purposes
-rumqttd = { git="https://github.com/jaredwolff/rumqtt", branch="adding-server-login-credential-check", default-features=false } # Mqtt core bits
