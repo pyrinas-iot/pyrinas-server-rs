@@ -87,7 +87,24 @@ pub enum CertSubcommand {
     /// Generate server cert
     Server,
     /// Generate device cert
-    Device { id: String },
+    Device(CertDevice),
+}
+
+/// Remove a OTA package from the sever
+#[derive(Clap, Debug)]
+#[clap(version = crate_version!())]
+pub struct CertDevice {
+    /// Id of the device (usually IMEI)
+    id: Option<String>,
+    /// Automatic provision
+    #[clap(long, short)]
+    provision: bool,
+    /// Serial port
+    #[clap(default_value = certs::DEFAULT_MAC_PORT )]
+    port: String,
+    /// Security tag for provisioning
+    #[clap(default_value = certs::DEFAULT_MAC_PORT )]
+    tag: String,
 }
 
 #[derive(Clap, Debug)]

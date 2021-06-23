@@ -1,14 +1,27 @@
 use chrono::{Datelike, Utc};
 use p12::PFX;
 use pem::Pem;
+use promptly::prompt_default;
 use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa,
     KeyUsagePurpose, SanType,
 };
-use std::{convert::TryInto, fs, io};
+use serialport;
+use std::{
+    convert::TryInto,
+    fs::{self, File},
+    io::{self, BufRead, BufReader},
+    thread, time,
+};
 use thiserror::Error;
 
 use crate::{config, ota, CertCmd, CertConfig, CertSubcommand};
+
+/// Default serial port for MAC
+pub const DEFAULT_MAC_PORT: &str = "/dev/tty.SLAB_USBtoUART";
+
+/// Default security tag for Pyrinas
+pub const DEFAULT_PYRINAS_SECURITY_TAG: &str = "1234";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -48,6 +61,21 @@ pub enum Error {
         #[from]
         source: ota::Error,
     },
+
+    #[error("{source}")]
+    SerialError {
+        #[from]
+        source: serialport::Error,
+    },
+
+    #[error("{source}")]
+    PromptError {
+        #[from]
+        source: promptly::ReadlineError,
+    },
+
+    #[error("err: {0}")]
+    CustomError(String),
 }
 
 fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
@@ -86,8 +114,163 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
         CertSubcommand::Server => {
             generate_server_cert(&config.cert)?;
         }
-        CertSubcommand::Device { id } => {
-            generate_device_cert(&config.cert, &id)?;
+        CertSubcommand::Device(cmd) => {
+            let id = match cmd.id.clone() {
+                Some(id) => id,
+                None => {
+                    // Open port
+                    let mut port = serialport::new(&cmd.port, 115_200)
+                        .timeout(time::Duration::from_millis(10))
+                        .open()?;
+
+                    let mut reader = BufReader::new(port.try_clone()?);
+
+                    // issue AT command to get IMEI
+                    port.write_fmt(format_args!("AT+CGSN=1?\r\n"))?;
+
+                    // Get the current timestamp
+                    let now = time::Instant::now();
+
+                    loop {
+                        if now.elapsed().as_secs() > 5 {
+                            return Err(Error::CustomError(String::from(
+                                "Timeout communicating with device.",
+                            )));
+                        }
+
+                        let mut line = String::new();
+                        if let Ok(_) = reader.read_line(&mut line) {
+                            // See if the line contains the start dialog
+                            if line.contains("+CGSN: ") {
+                                break line
+                                    .strip_prefix("+CGSN: ")
+                                    .expect("Should have had a value!")
+                                    .trim_end()
+                                    .trim_matches('\"')
+                                    .to_string();
+                            } else if line.contains("at_host: Error") {
+                                return Err(Error::CustomError(String::from(
+                                    "AT error communicating with device.",
+                                )));
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Generate cert
+            let certs = match generate_device_cert(&config.cert, &id) {
+                Ok(c) => c,
+                Err(_e) => {
+                    println!("Cert for {} already generated!", &id);
+
+                    // Get path
+                    let path = get_device_cert_path(&config.cert, &id)?;
+
+                    // Read from file
+                    let file = File::open(path)?;
+                    let reader = BufReader::new(file);
+
+                    // Convert to DeviceCert
+                    serde_json::from_reader(reader)?
+                }
+            };
+
+            // if the provision flag is set provision it
+            if cmd.provision {
+                // Open port
+                let mut port = serialport::new(&cmd.port, 115_200)
+                    .timeout(time::Duration::from_millis(10))
+                    .open()?;
+
+                // confirm provision
+                if prompt_default("Ready to provision to device. Continue?", false)? {
+                    // Set the certificate..
+                    // AT%CMNG=0,16842753,0,""
+                    if let Err(e) = port.write_fmt(format_args!(
+                        "AT%CMNG=0,{},0,\"{}\"\r\n",
+                        DEFAULT_PYRINAS_SECURITY_TAG, &certs.ca_cert
+                    )) {
+                        return Err(Error::CustomError(format!(
+                            "Unable to write CA cert. Error: {}",
+                            e
+                        )));
+                    }
+
+                    // Flush output
+                    let _ = port.flush();
+
+                    // Get the reader
+                    let mut reader = BufReader::new(port.try_clone()?);
+
+                    // Wait for "OK" response
+                    loop {
+                        let mut line = String::new();
+                        if let Ok(_) = reader.read_line(&mut line) {
+                            if line.contains("OK") {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Delay
+                    thread::sleep(time::Duration::from_secs(2));
+
+                    // AT%CMNG=0,16842753,1,""
+                    if let Err(e) = port.write_fmt(format_args!(
+                        "AT%CMNG=0,{},1,\"{}\"\r\n",
+                        DEFAULT_PYRINAS_SECURITY_TAG, certs.client_cert
+                    )) {
+                        return Err(Error::CustomError(format!(
+                            "Unable to write client cert. Error: {}",
+                            e
+                        )));
+                    }
+
+                    // Flush output
+                    let _ = port.flush();
+
+                    // Wait for "OK" response
+                    loop {
+                        let mut line = String::new();
+                        if let Ok(_) = reader.read_line(&mut line) {
+                            if line.contains("OK") {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Delay
+                    thread::sleep(time::Duration::from_secs(2));
+
+                    // AT%CMNG=0,16842753,2,""
+                    if let Err(e) = port.write_fmt(format_args!(
+                        "AT%CMNG=0,{},2,\"{}\"\r\n",
+                        DEFAULT_PYRINAS_SECURITY_TAG, certs.private_key
+                    )) {
+                        //
+                        return Err(Error::CustomError(format!(
+                            " Unable to write private key. Error: {}",
+                            e
+                        )));
+                    }
+
+                    // Flush output
+                    let _ = port.flush();
+
+                    // Wait for "OK" response
+                    loop {
+                        let mut line = String::new();
+                        if let Ok(_) = reader.read_line(&mut line) {
+                            if line.contains("OK") {
+                                break;
+                            }
+                        }
+                    }
+
+                    println!("Provisioning complete!");
+                }
+            }
         }
     };
 
@@ -144,7 +327,7 @@ fn write_device_json(
     cert: &Certificate,
     ca_cert: &Certificate,
     ca_der: &Vec<u8>,
-) -> Result<(), Error> {
+) -> Result<crate::device::DeviceCert, Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -183,7 +366,7 @@ fn write_device_json(
         &json_output.as_bytes(),
     )?;
 
-    Ok(())
+    Ok(json_device_cert)
 }
 
 pub fn write_keypair_pem(
@@ -345,15 +528,22 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result<(), Error> {
+pub fn get_device_cert_path(config: &crate::CertConfig, name: &String) -> Result<String, Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
 
-    let device_cert_path = format!(
+    Ok(format!(
         "{}/certs/{}/{}/{}.pem",
         config_path, config.domain, name, name
-    );
+    ))
+}
+
+pub fn generate_device_cert(
+    config: &crate::CertConfig,
+    name: &String,
+) -> Result<crate::device::DeviceCert, Error> {
+    let device_cert_path = get_device_cert_path(config, name)?;
 
     // Check if it exists
     if std::path::Path::new(&device_cert_path).exists() {
@@ -388,12 +578,9 @@ pub fn generate_device_cert(config: &crate::CertConfig, name: &String) -> Result
     // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
 
     // Write nRF Connect Desktop compatable JSON for cert install
-    write_device_json(&config, &name, &cert, &ca_cert, &ca_der)?;
+    let certs = write_device_json(&config, &name, &cert, &ca_cert, &ca_der)?;
 
-    println!(
-        "Exported cert for {} to {}/{}",
-        name, config_path, config.domain
-    );
+    println!("Exported cert for {} to {}", name, device_cert_path);
 
-    Ok(())
+    Ok(certs)
 }
