@@ -2,6 +2,10 @@
 
 ![Pyrinas Logo](docs/img/pyrinas-logo-crab.png)
 
+[![Build Status](https://github.com/pyrinas-iot/pyrinas-server-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/pyrinas-iot/pyrinas-server-rs/actions/)
+[![Coverage Status (codecov.io)](https://codecov.io/gh/pyrinas-server-rs/actions/branch/main/graph/badge.svg)](https://codecov.io/gh/pyrinas-server-rs/actions/)
+![License](https://img.shields.io/github/license/pyrinas-iot/pyrinas-server-rs)
+
 For the latest changes, check out the [changelog](Changelog.md). 
 
 Interested how all the pieces fit together? Check out the [architecture](Architecture.md);
@@ -120,16 +124,17 @@ Here's what's on my plate and what's to come:
   - [x] Add and associate image to a specific device
 - [x] Support for multi-image uploads
 - [ ] Secure MQTT functionality
-  - [ ] Passwords
+  - [x] Passwords
   - [ ] TLS Client Authentication
 - [ ] Remote logging
 - [ ] Multi-instance CLI mode (switching between different Pyrinas instances)
-- [ ] Get CI up and running
-- [ ] CI building on releases
+- [x] Get CI up and running
+- [ ] CI building assets on releases
 - [x] Cert generation via CLI
   - [x] Client cert
   - [x] Server cert
   - [x] CA Cert
+  - [x] Automoatic provisoning to nRF9160 Feather
 
 ## Don't see what you're looking for?
 

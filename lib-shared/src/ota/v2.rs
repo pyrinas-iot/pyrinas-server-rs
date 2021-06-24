@@ -60,8 +60,7 @@ impl Into<Option<super::v1::OTAPackage>> for OTAPackage {
         let image = self
             .files
             .iter()
-            .filter(|x| x.image_type == OTAImageType::Primary)
-            .nth(0);
+            .find(|x| x.image_type == OTAImageType::Primary);
 
         // Depending if there's a primary image, organize
         match image {
