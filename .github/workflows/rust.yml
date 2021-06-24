@@ -73,22 +73,6 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-      - name: cargo test (debug; all features)
-        run: cargo test --all-features
-        env:
-          RUST_BACKTRACE: 1
-
-      - name: cargo build (debug; no default features)
-        run: cargo build --no-default-features
-        working-directory: rustls
-
-      - name: cargo test (debug; no default features; no run)
-        run: cargo test --no-default-features --no-run
-        working-directory: rustls
-
-      - name: cargo test (release; no run)
-        run: cargo test --release --no-run
-
   clippy:
     name: Clippy
     runs-on: ubuntu-18.04
@@ -133,6 +117,9 @@ jobs:
 
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.18.0-alpha3'
+          args: '--avoid-cfg-tarpaulin'
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
