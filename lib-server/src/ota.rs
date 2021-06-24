@@ -31,7 +31,7 @@ pub struct OTADatabase {
 }
 
 /// Get the OTA package from database by `update_id`
-pub fn get_ota_package(db: &OTADatabase, update_id: &String) -> Result<OTAPackage> {
+pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage> {
     // Check if there's a package available and ready
     let entry = match db.images.get(&update_id)? {
         Some(e) => e,
@@ -46,7 +46,7 @@ pub fn get_ota_package(db: &OTADatabase, update_id: &String) -> Result<OTAPackag
 }
 
 /// Get the OTA package by device ID
-fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &String) -> Result<OTAPackage> {
+fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAPackage> {
     // Get the group_id
     let group_id: String = match db.devices.get(&device_id)? {
         Some(e) => String::from_utf8(e.to_vec())?,
@@ -131,7 +131,7 @@ pub async fn process_event(
                             OtaUpdateVersioned {
                                 v1: Some(ota::v1::OtaUpdate {
                                     uid: device_id.clone(),
-                                    package: package,
+                                    package,
                                     image: None,
                                 }),
                                 v2: None,
@@ -141,7 +141,7 @@ pub async fn process_event(
                             v1: None,
                             v2: Some(OtaUpdate {
                                 uid: Some(device_id.clone()),
-                                package: package,
+                                package,
                                 images: None,
                             }),
                         },
@@ -163,21 +163,21 @@ pub async fn process_event(
             // Match the different possiblities
             match (&device_id, &group_id) {
                 (None, Some(g)) => {
-                    if let Err(_) = dissociate_group(&db, &g).await {
+                    if dissociate_group(&db, &g).await.is_err() {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
                 }
                 (Some(d), None) => {
-                    if let Err(_) = dissociate_device(&db, &d).await {
+                    if dissociate_device(&db, &d).await.is_err() {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
                 (Some(d), Some(g)) => {
-                    if let Err(_) = dissociate_group(&db, &g).await {
+                    if dissociate_group(&db, &g).await.is_err() {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
 
-                    if let Err(_) = dissociate_device(&db, &d).await {
+                    if dissociate_device(&db, &d).await.is_err() {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
@@ -377,26 +377,23 @@ pub async fn process_event(
         Event::OtaUpdateImageListRequest() => {
             let mut response = OtaImageListResponse { images: Vec::new() };
 
-            for image in db.images.into_iter() {
-                match image {
-                    Ok((k, v)) => {
-                        // Deserialize
-                        let key = match String::from_utf8(k.to_vec()) {
-                            Ok(k) => k,
-                            Err(_) => continue,
-                        };
+            for image in db.images.into_iter().flatten() {
+                let (k, v) = image;
 
-                        // Deserialize
-                        let value: OTAPackage = match serde_cbor::from_slice(&v) {
-                            Ok(v) => v,
-                            Err(_) => continue,
-                        };
+                // Deserialize
+                let key = match String::from_utf8(k.to_vec()) {
+                    Ok(k) => k,
+                    Err(_) => continue,
+                };
 
-                        // Add the image
-                        response.images.push((key, value));
-                    }
-                    Err(_) => (),
-                }
+                // Deserialize
+                let value: OTAPackage = match serde_cbor::from_slice(&v) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+
+                // Add the image
+                response.images.push((key, value));
             }
 
             // Notify mqtt to send update!
@@ -408,20 +405,17 @@ pub async fn process_event(
         Event::OtaUpdateGroupListRequest() => {
             let mut response = OtaGroupListResponse { groups: Vec::new() };
 
-            for image in db.groups.into_iter() {
-                match image {
-                    Ok((k, _v)) => {
-                        // Deserialize
-                        let key = match String::from_utf8(k.to_vec()) {
-                            Ok(k) => k,
-                            Err(_) => continue,
-                        };
+            for image in db.groups.into_iter().flatten() {
+                let (k, _v) = image;
 
-                        // Add the image
-                        response.groups.push(key);
-                    }
-                    Err(_) => (),
-                }
+                // Deserialize
+                let key = match String::from_utf8(k.to_vec()) {
+                    Ok(k) => k,
+                    Err(_) => continue,
+                };
+
+                // Add the image
+                response.groups.push(key);
             }
 
             // Notify mqtt to send update!
@@ -430,7 +424,7 @@ pub async fn process_event(
                 .await
                 .unwrap();
         }
-        _ => {}
+        _ => (),
     }
 }
 
@@ -458,7 +452,7 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
     }
 }
 
-async fn dissociate_device(db: &OTADatabase, device_id: &String) -> Result<()> {
+async fn dissociate_device(db: &OTADatabase, device_id: &str) -> Result<()> {
     // Delete entry from dB
     db.devices.remove(&device_id)?;
     db.devices.flush_async().await?;
@@ -466,7 +460,7 @@ async fn dissociate_device(db: &OTADatabase, device_id: &String) -> Result<()> {
     Ok(())
 }
 
-async fn dissociate_group(db: &OTADatabase, group_id: &String) -> Result<()> {
+async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<()> {
     // Delete entry from dB
     db.groups.remove(&group_id)?;
     db.groups.flush_async().await?;
@@ -487,8 +481,8 @@ async fn delete_all_ota_data(db: &OTADatabase, settings: &settings::Ota) -> Resu
 /// Associate device_id with group_id
 async fn associate_device_with_group(
     db: &OTADatabase,
-    device_id: &String,
-    group_id: &String,
+    device_id: &str,
+    group_id: &str,
 ) -> Result<()> {
     // Insert the encoded data back into the db
     db.devices.insert(&device_id, group_id.as_bytes())?;
@@ -500,8 +494,8 @@ async fn associate_device_with_group(
 /// Associate group_id with update_id
 async fn associate_group_with_update(
     db: &OTADatabase,
-    group_id: &String,
-    update_id: &String,
+    group_id: &str,
+    update_id: &str,
 ) -> Result<()> {
     // Check if insert worked ok
     db.groups.insert(&group_id, update_id.as_bytes())?;
@@ -510,14 +504,14 @@ async fn associate_group_with_update(
     Ok(())
 }
 
-fn get_update_file_path(image_type: &OTAImageType, update_name: &String) -> String {
+fn get_update_file_path(image_type: &OTAImageType, update_name: &str) -> String {
     format!("{}/{}.bin", update_name, image_type)
 }
 
 /// Take binary data and save it to the image directory..
 pub async fn save_ota_firmware_image(
-    folder_path: &String,
-    name: &String,
+    folder_path: &str,
+    name: &str,
     image: &OTAImageData,
 ) -> Result<()> {
     let base_path = format!("{}/{}", folder_path, name);
@@ -548,7 +542,7 @@ pub async fn save_ota_firmware_image(
     Ok(())
 }
 
-pub async fn delete_ota_firmware_image(path: &String, name: &String) -> Result<()> {
+pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
     // Delete the folder from the filesystem
     fs::remove_dir_all(format!("{}/{}/", path, &name))?;
 
@@ -579,7 +573,7 @@ pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()
 }
 
 /// Deletes the OTA package from the database and filesystem.
-pub async fn delete_ota_package(db: &OTADatabase, update_id: &String) -> Result<()> {
+pub async fn delete_ota_package(db: &OTADatabase, update_id: &str) -> Result<()> {
     // Delete entry from dB
     db.images.remove(&update_id)?;
     db.images.flush_async().await?;
@@ -591,7 +585,6 @@ pub async fn delete_ota_package(db: &OTADatabase, update_id: &String) -> Result<
 /// i.e. hosts static firmware images that can be pulled by the
 /// firmware.
 pub async fn ota_http_run(settings: &settings::Ota) {
-    // TODO: for async-std use `tide`
     // TODO: API key for more secure transfers
 
     // Only one folder that we're interested in..

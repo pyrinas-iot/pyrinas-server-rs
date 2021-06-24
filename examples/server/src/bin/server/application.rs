@@ -24,25 +24,19 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
         log::info!("{:?}", event);
 
         // Match the event. The only one we're interested in is the `ApplicationRequest`
-        match event {
-            Event::ApplicationRequest(req) => {
-                match req.target.as_str() {
-                    "env" => {
-                        // Deserialize data from MQTT clients
-                        let msg: EnvironmentData = match serde_cbor::from_slice(&req.msg) {
-                            Ok(m) => m,
-                            Err(e) => {
-                                log::warn!("Unable to deserialize from MQTT message. Err: {}", e);
-                                continue;
-                            }
-                        };
-
-                        log::info!("{:?}", msg);
+        if let Event::ApplicationRequest(req) = event {
+            if req.target.as_str() == "env" {
+                // Deserialize data from MQTT clients
+                let msg: EnvironmentData = match serde_cbor::from_slice(&req.msg) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        log::warn!("Unable to deserialize from MQTT message. Err: {}", e);
+                        continue;
                     }
-                    _ => {}
                 };
+
+                log::info!("{:?}", msg);
             }
-            _ => {}
         }
     }
 }

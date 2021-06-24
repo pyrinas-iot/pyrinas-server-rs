@@ -263,7 +263,7 @@ pub fn associate(
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &String) -> Result<(), Error> {
+pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &str) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::RemoveOta,

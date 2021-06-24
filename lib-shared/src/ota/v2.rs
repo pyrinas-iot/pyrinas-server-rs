@@ -55,9 +55,9 @@ impl fmt::Display for OTAPackage {
     }
 }
 
-impl Into<Option<super::v1::OTAPackage>> for OTAPackage {
-    fn into(self) -> Option<super::v1::OTAPackage> {
-        let image = self
+impl From<OTAPackage> for Option<super::v1::OTAPackage> {
+    fn from(pkg: OTAPackage) -> Self {
+        let image = pkg
             .files
             .iter()
             .find(|x| x.image_type == OTAImageType::Primary);
@@ -65,7 +65,7 @@ impl Into<Option<super::v1::OTAPackage>> for OTAPackage {
         // Depending if there's a primary image, organize
         match image {
             Some(i) => Some(super::v1::OTAPackage {
-                version: self.version.clone(),
+                version: pkg.version.clone(),
                 host: i.host.clone(),
                 file: i.file.clone(),
                 force: false,

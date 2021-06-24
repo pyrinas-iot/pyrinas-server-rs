@@ -8,17 +8,7 @@ use tokio::sync::Mutex;
 use warp::ws::Message;
 
 // Unix listener
-cfg_if::cfg_if! {
-
-   if #[cfg(feature = "runtime_tokio")] {
-    use warp::{ws::WebSocket,Filter};
-   } else if #[cfg(feature = "runtime_async_std")] {
-    use async_std::os::unix::net::UnixListener;
-    use async_std::prelude::*;
-    use async_std::task;
-   }
-
-}
+use warp::{ws::WebSocket, Filter};
 
 // Local lib related
 use crate::settings;
@@ -61,16 +51,7 @@ async fn handle_connection(
         *client.lock().await = Some(tx);
     }
 
-    loop {
-        // Get the next message
-        let msg = match ws_rx.next().await {
-            Some(m) => match m {
-                Ok(m) => m,
-                Err(_) => break,
-            },
-            None => break,
-        };
-
+    while let Some(Ok(msg)) = ws_rx.next().await {
         log::debug!("msg size: {}", msg.as_bytes().len());
 
         // First deocde into ManagementRequest struct

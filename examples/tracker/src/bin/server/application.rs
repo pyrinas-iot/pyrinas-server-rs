@@ -26,23 +26,82 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
         log::debug!("{:?}", event);
 
         // Match the event. The only one we're interested in is the `ApplicationRequest`
-        match event {
-            Event::ApplicationRequest(req) => {
-                // let payload = match str::from_utf8(&req.msg) {
-                //     Ok(p) => p,
-                //     Err(_e) => {
-                //         log::error!("Unable to get json string!");
-                //         continue;
-                //     }
-                // };
+        if let Event::ApplicationRequest(req) = event {
+            // let payload = match str::from_utf8(&req.msg) {
+            //     Ok(p) => p,
+            //     Err(_e) => {
+            //         log::error!("Unable to get json string!");
+            //         continue;
+            //     }
+            // };
 
-                log::info!("target: {}", req.target);
+            log::info!("target: {}", req.target);
 
-                match req.target.as_str() {
-                    // Handle a certain event
-                    "data" => {
+            match req.target.as_str() {
+                // Handle a certain event
+                "data" => {
+                    // Handle deserialization of JSON from Asset Tracker V2
+                    let payload: crate::structures::data::TrackerPayload =
+                        match serde_json::from_slice(&req.msg) {
+                            Ok(p) => p,
+                            Err(e) => {
+                                log::error!("Unable to deserialize data! Err: {}", e);
+                                continue;
+                            }
+                        };
+
+                    // Convert to TrackerStateReport
+                    let payload = payload.state.reported;
+
+                    log::info!("deserialized data: {:?}", payload);
+
+                    // Pubish GPS to Influx
+                    if let Some(r) = payload.gps {
+                        let query = r.to_influx(&req.uid).into_query("gps");
+
+                        // Send the query
+                        if let Err(e) = broker_sender
+                            .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                            .await
+                        {
+                            log::error!("Unable to publish query to Influx! {:?}", e);
+                        }
+                    };
+
+                    // Publish Cellular Data to Influx
+                    if let Some(r) = payload.roam {
+                        let query = r.to_influx(&req.uid).into_query("roam");
+
+                        // Send the query
+                        if let Err(e) = broker_sender
+                            .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                            .await
+                        {
+                            log::error!("Unable to publish query to Influx! {:?}", e);
+                        }
+                    };
+
+                    // Publish Battery Data to Influx
+                    if let Some(r) = payload.bat {
+                        let query = r.to_influx(&req.uid).into_query("batt");
+
+                        // Send the query
+                        if let Err(e) = broker_sender
+                            .send_async(pyrinas_server::Event::InfluxDataSave(query))
+                            .await
+                        {
+                            log::error!("Unable to publish query to Influx! {:?}", e);
+                        }
+                    };
+                }
+                /* TODO: decode other entries besides accel */
+                "batch" => match str::from_utf8(&req.msg) {
+                    // TrackerBulkReport
+                    Ok(m) => {
+                        log::info!("batch: {}", m);
+
                         // Handle deserialization of JSON from Asset Tracker V2
-                        let payload: crate::structures::data::TrackerPayload =
+                        let payload: crate::structures::data::TrackerBulkReport =
                             match serde_json::from_slice(&req.msg) {
                                 Ok(p) => p,
                                 Err(e) => {
@@ -51,14 +110,9 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                                 }
                             };
 
-                        // Convert to TrackerStateReport
-                        let payload = payload.state.reported;
-
-                        log::info!("deserialized data: {:?}", payload);
-
-                        // Pubish GPS to Influx
-                        if let Some(r) = payload.gps {
-                            let query = r.to_influx(&req.uid).into_query("gps");
+                        // Submit each
+                        for val in payload.acc {
+                            let query = val.to_influx(&req.uid).into_query("accel");
 
                             // Send the query
                             if let Err(e) = broker_sender
@@ -66,73 +120,16 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                                 .await
                             {
                                 log::error!("Unable to publish query to Influx! {:?}", e);
-                            }
-                        };
-
-                        // Publish Cellular Data to Influx
-                        if let Some(r) = payload.roam {
-                            let query = r.to_influx(&req.uid).into_query("roam");
-
-                            // Send the query
-                            if let Err(e) = broker_sender
-                                .send_async(pyrinas_server::Event::InfluxDataSave(query))
-                                .await
-                            {
-                                log::error!("Unable to publish query to Influx! {:?}", e);
-                            }
-                        };
-
-                        // Publish Battery Data to Influx
-                        if let Some(r) = payload.bat {
-                            let query = r.to_influx(&req.uid).into_query("batt");
-
-                            // Send the query
-                            if let Err(e) = broker_sender
-                                .send_async(pyrinas_server::Event::InfluxDataSave(query))
-                                .await
-                            {
-                                log::error!("Unable to publish query to Influx! {:?}", e);
-                            }
-                        };
-                    }
-                    /* TODO: decode other entries besides accel */
-                    "batch" => match str::from_utf8(&req.msg) {
-                        // TrackerBulkReport
-                        Ok(m) => {
-                            log::info!("batch: {}", m);
-
-                            // Handle deserialization of JSON from Asset Tracker V2
-                            let payload: crate::structures::data::TrackerBulkReport =
-                                match serde_json::from_slice(&req.msg) {
-                                    Ok(p) => p,
-                                    Err(e) => {
-                                        log::error!("Unable to deserialize data! Err: {}", e);
-                                        continue;
-                                    }
-                                };
-
-                            // Submit each
-                            for val in payload.acc {
-                                let query = val.to_influx(&req.uid).into_query("accel");
-
-                                // Send the query
-                                if let Err(e) = broker_sender
-                                    .send_async(pyrinas_server::Event::InfluxDataSave(query))
-                                    .await
-                                {
-                                    log::error!("Unable to publish query to Influx! {:?}", e);
-                                }
                             }
                         }
-                        Err(e) => log::error!("Error: {}", e),
-                    },
-                    "env" => {
-                        // TODO: handle deserialization of JSON from Asset Tracker V2
                     }
-                    _ => {}
-                };
-            }
-            _ => {}
+                    Err(e) => log::error!("Error: {}", e),
+                },
+                "env" => {
+                    // TODO: handle deserialization of JSON from Asset Tracker V2
+                }
+                _ => {}
+            };
         }
     }
 }

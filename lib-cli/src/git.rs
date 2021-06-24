@@ -94,8 +94,8 @@ pub fn get_ota_package_version(ver: &str) -> Result<(OTAPackageVersion, bool), G
             major: version.major as u8,
             minor: version.minor as u8,
             patch: version.patch as u8,
-            commit: commit,
-            hash: hash,
+            commit,
+            hash,
         },
         dirty,
     ))

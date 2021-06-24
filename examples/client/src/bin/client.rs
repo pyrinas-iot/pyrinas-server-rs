@@ -2,9 +2,6 @@ use pyrinas_codec_example::EnvironmentData;
 use rumqttc::{self, AsyncClient, MqttOptions, QoS};
 use std::time::Duration;
 
-// Tokio/async
-use tokio;
-
 // Command line parsing
 use clap::{crate_version, Clap};
 

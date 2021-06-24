@@ -20,21 +20,18 @@ pub struct TrackerGpsReport {
 }
 
 impl TrackerGpsReport {
-    pub fn to_influx(&self, id: &String) -> influx::TrackerGpsInfluxReport {
+    pub fn to_influx(&self, id: &str) -> influx::TrackerGpsInfluxReport {
         // Return new data structure that's friendly with Influx
-        let report = influx::TrackerGpsInfluxReport {
+        influx::TrackerGpsInfluxReport {
             time: self.ts,
-            id: id.clone(),
+            id: id.to_string(),
             lng: self.v.lng,
             lat: self.v.lat,
             acc: self.v.acc,
             alt: self.v.alt,
             spd: self.v.spd,
             hdg: self.v.hdg,
-        };
-
-        // Return the influx equivalent
-        report
+        }
     }
 }
 
@@ -55,20 +52,17 @@ pub struct TrackerRoamReport {
 }
 
 impl TrackerRoamReport {
-    pub fn to_influx(&self, id: &String) -> influx::TrackerRoamInfluxReport {
+    pub fn to_influx(&self, id: &str) -> influx::TrackerRoamInfluxReport {
         // Return new data structure that's friendly with Influx
-        let report = influx::TrackerRoamInfluxReport {
+        influx::TrackerRoamInfluxReport {
             time: self.ts,
-            id: id.clone(),
+            id: id.to_string(),
             rsrp: self.v.rsrp,
             area: self.v.area,
             mccmnc: self.v.mccmnc,
             cell: self.v.cell,
             ip: self.v.ip.clone(),
-        };
-
-        // Return the influx equivalent
-        report
+        }
     }
 }
 
@@ -99,16 +93,13 @@ pub struct TrackerBatteryReport {
 }
 
 impl TrackerBatteryReport {
-    pub fn to_influx(&self, id: &String) -> influx::TrackerBattInfluxReport {
+    pub fn to_influx(&self, id: &str) -> influx::TrackerBattInfluxReport {
         // Return new data structure that's friendly with Influx
-        let report = influx::TrackerBattInfluxReport {
+        influx::TrackerBattInfluxReport {
             time: self.ts,
-            id: id.clone(),
+            id: id.to_string(),
             val: self.v,
-        };
-
-        // Return the influx equivalent
-        report
+        }
     }
 }
 
@@ -127,18 +118,15 @@ pub struct TrackerAccelReport {
 }
 
 impl TrackerAccelReport {
-    pub fn to_influx(&self, id: &String) -> influx::TrackerAccelInfluxReport {
+    pub fn to_influx(&self, id: &str) -> influx::TrackerAccelInfluxReport {
         // Return new data structure that's friendly with Influx
-        let report = influx::TrackerAccelInfluxReport {
+        influx::TrackerAccelInfluxReport {
             time: self.ts,
-            id: id.clone(),
+            id: id.to_string(),
             x: self.v.x,
             y: self.v.y,
             z: self.v.z,
-        };
-
-        // Return the influx equivalent
-        report
+        }
     }
 }
 

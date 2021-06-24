@@ -139,7 +139,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                         }
 
                         let mut line = String::new();
-                        if let Ok(_) = reader.read_line(&mut line) {
+                        if reader.read_line(&mut line).is_ok() {
                             // See if the line contains the start dialog
                             if line.contains("+CGSN: ") {
                                 break line
@@ -206,10 +206,8 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     // Wait for "OK" response
                     loop {
                         let mut line = String::new();
-                        if let Ok(_) = reader.read_line(&mut line) {
-                            if line.contains("OK") {
-                                break;
-                            }
+                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                            break;
                         }
                     }
 
@@ -233,10 +231,8 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     // Wait for "OK" response
                     loop {
                         let mut line = String::new();
-                        if let Ok(_) = reader.read_line(&mut line) {
-                            if line.contains("OK") {
-                                break;
-                            }
+                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                            break;
                         }
                     }
 
@@ -261,10 +257,8 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     // Wait for "OK" response
                     loop {
                         let mut line = String::new();
-                        if let Ok(_) = reader.read_line(&mut line) {
-                            if line.contains("OK") {
-                                break;
-                            }
+                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                            break;
                         }
                     }
 
@@ -323,10 +317,10 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
 
 fn write_device_json(
     config: &CertConfig,
-    name: &String,
+    name: &str,
     cert: &Certificate,
     ca_cert: &Certificate,
-    ca_der: &Vec<u8>,
+    ca_der: &[u8],
 ) -> Result<crate::device::DeviceCert, Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
@@ -371,7 +365,7 @@ fn write_device_json(
 
 pub fn write_keypair_pem(
     config: &CertConfig,
-    name: &String,
+    name: &str,
     cert: &Certificate,
     ca_cert: &Certificate,
 ) -> Result<(), Error> {
@@ -407,10 +401,10 @@ pub fn write_keypair_pem(
 
 fn write_pfx(
     config: &CertConfig,
-    name: &String,
+    name: &str,
     cert: &Certificate,
     ca_cert: &Certificate,
-    ca_der: &Vec<u8>,
+    ca_der: &[u8],
 ) -> Result<(), Error> {
     // Config path
     let config_path = crate::config::get_config_path()?
@@ -491,9 +485,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
 
     // Check if it exists
     if std::path::Path::new(&server_cert_path).exists() {
-        return Err(Error::AlreadyExists {
-            name: name.to_string(),
-        });
+        return Err(Error::AlreadyExists { name });
     }
 
     // Get CA Cert
@@ -528,7 +520,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn get_device_cert_path(config: &crate::CertConfig, name: &String) -> Result<String, Error> {
+pub fn get_device_cert_path(config: &crate::CertConfig, name: &str) -> Result<String, Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
@@ -541,7 +533,7 @@ pub fn get_device_cert_path(config: &crate::CertConfig, name: &String) -> Result
 
 pub fn generate_device_cert(
     config: &crate::CertConfig,
-    name: &String,
+    name: &str,
 ) -> Result<crate::device::DeviceCert, Error> {
     let device_cert_path = get_device_cert_path(config, name)?;
 

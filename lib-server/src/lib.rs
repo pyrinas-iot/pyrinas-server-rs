@@ -17,11 +17,8 @@ use flume::{Receiver, Sender};
 use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned, OtaVersion};
 use std::sync::Arc;
 
-#[cfg(feature = "runtime_tokio")]
+// Runtime
 use tokio::task;
-
-#[cfg(feature = "runtime_async_std")]
-use async_std::task;
 
 // MQTT related
 use librumqttd::async_locallink::construct_broker;
@@ -60,7 +57,7 @@ pub async fn run(
     let task_settings = settings.clone();
 
     // Start unix socket task
-    if let Some(_) = task_settings.admin {
+    if task_settings.admin.is_some() {
         task::spawn(async move {
             if let Err(e) = admin::run(&task_settings.admin.to_owned().unwrap(), task_sender).await
             {
