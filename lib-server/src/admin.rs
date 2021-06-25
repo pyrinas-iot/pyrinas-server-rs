@@ -154,10 +154,7 @@ async fn handle_connection(
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(
-    settings: &settings::Admin,
-    broker_sender: Sender<Event>,
-) -> Result<(), Error> {
+pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Result<(), Error> {
     // Get the sender/reciever associated with this particular task
     let (sender, receiver) = unbounded::<Event>();
 

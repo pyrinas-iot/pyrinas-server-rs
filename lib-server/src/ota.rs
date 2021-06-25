@@ -36,7 +36,7 @@ pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage, 
     let entry = match db.images.get(&update_id)? {
         Some(e) => e,
         None => {
-            return Err(Error::CustomError(format!("No data available.")));
+            return Err(Error::CustomError("No data available.".to_string()));
         }
     };
 
@@ -73,7 +73,7 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTA
     let mut package: OTAPackage = match db.images.get(&image_id)? {
         Some(e) => serde_cbor::from_slice(&e)?,
         None => {
-            return Err(Error::CustomError(format!("No data available.")));
+            return Err(Error::CustomError("No data available.".to_string()));
         }
     };
 
@@ -562,7 +562,7 @@ pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()
     // Get the package
     let package = match &update.package {
         Some(p) => p,
-        None => return Err(Error::CustomError(format!("Package must exist!"))),
+        None => return Err(Error::CustomError("Package must exist!".to_string())),
     };
 
     // Generate the update ID
