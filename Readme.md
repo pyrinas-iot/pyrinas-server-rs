@@ -3,7 +3,7 @@
 ![Pyrinas Logo](docs/img/pyrinas-logo-crab.png)
 
 [![Build Status](https://github.com/pyrinas-iot/pyrinas-server-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/pyrinas-iot/pyrinas-server-rs/actions/)
-[![Coverage Status (codecov.io)](https://codecov.io/gh/pyrinas-server-rs/actions/branch/main/graph/badge.svg)](https://codecov.io/gh/pyrinas-server-rs/actions/)
+[![Code Coverage (codecov)](https://codecov.io/gh/pyrinas-iot/pyrinas-server-rs/branch/main/graph/badge.svg?token=R4ZIYGW976)](https://codecov.io/gh/pyrinas-iot/pyrinas-server-rs)
 [![License](https://img.shields.io/github/license/pyrinas-iot/pyrinas-server-rs)](https://github.com/pyrinas-iot/pyrinas-server-rs/blob/main/LICENSE)
 
 For the latest changes, check out the [changelog](Changelog.md). 
