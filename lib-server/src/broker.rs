@@ -5,11 +5,11 @@ use std::collections::hash_map::{Entry, HashMap};
 // Channels
 use flume::{Receiver, Sender};
 
-// Error
-use anyhow::{anyhow, Result};
-
 // Local lib related
 use crate::Event;
+
+// Error
+use crate::Error;
 
 pub async fn run(broker_reciever: Receiver<Event>) {
     let mut runners: HashMap<String, Sender<Event>> = HashMap::new();
@@ -89,12 +89,15 @@ async fn send(
     task_name: &str,
     event: &Event,
     runners: &mut HashMap<String, Sender<Event>>,
-) -> Result<()> {
+) -> Result<(), Error> {
     match runners.get_mut(task_name) {
         Some(sender) => {
             sender.send_async(event.clone()).await?;
             Ok(())
         }
-        None => Err(anyhow!("{} broker task not registered!", task_name)),
+        None => Err(Error::CustomError(format!(
+            "{} broker task not registered!",
+            task_name
+        ))),
     }
 }

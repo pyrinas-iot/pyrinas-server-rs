@@ -7,9 +7,6 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 // Std
 use std::fs::{self, File};
 
-// Anyhow
-use anyhow::{anyhow, Result};
-
 // Local lib related
 use crate::{settings, Event};
 use pyrinas_shared::ota::v2::{
@@ -19,6 +16,9 @@ use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse, OtaRequestCmd};
 
 // warp
 use warp::{self, Filter};
+
+// Error
+use crate::Error;
 
 /// Used to organize all the trees within the OTA database
 pub struct OTADatabase {
@@ -31,12 +31,12 @@ pub struct OTADatabase {
 }
 
 /// Get the OTA package from database by `update_id`
-pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage> {
+pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage, Error> {
     // Check if there's a package available and ready
     let entry = match db.images.get(&update_id)? {
         Some(e) => e,
         None => {
-            return Err(anyhow!("No data available."));
+            return Err(Error::CustomError(format!("No data available.")));
         }
     };
 
@@ -46,12 +46,15 @@ pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage> 
 }
 
 /// Get the OTA package by device ID
-fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAPackage> {
+fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAPackage, Error> {
     // Get the group_id
     let group_id: String = match db.devices.get(&device_id)? {
         Some(e) => String::from_utf8(e.to_vec())?,
         None => {
-            return Err(anyhow!("Unable to find device: {}", device_id));
+            return Err(Error::CustomError(format!(
+                "Unable to find device: {}",
+                device_id
+            )));
         }
     };
 
@@ -59,7 +62,10 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTA
     let image_id: String = match db.groups.get(&group_id)? {
         Some(e) => String::from_utf8(e.to_vec())?,
         None => {
-            return Err(anyhow!("Unable to find group: {}", group_id));
+            return Err(Error::CustomError(format!(
+                "Unable to find group: {}",
+                group_id
+            )));
         }
     };
 
@@ -67,7 +73,7 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTA
     let mut package: OTAPackage = match db.images.get(&image_id)? {
         Some(e) => serde_cbor::from_slice(&e)?,
         None => {
-            return Err(anyhow!("No data available."));
+            return Err(Error::CustomError(format!("No data available.")));
         }
     };
 
@@ -79,7 +85,7 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTA
 
 /// Used to initialize the separate trees involved in the database.
 /// Used for quick lookup for devices, groups and images
-pub fn init_trees(db: &sled::Db) -> Result<OTADatabase> {
+pub fn init_trees(db: &sled::Db) -> Result<OTADatabase, Error> {
     Ok(OTADatabase {
         images: db.open_tree("images")?,
         devices: db.open_tree("devices")?,
@@ -452,7 +458,7 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
     }
 }
 
-async fn dissociate_device(db: &OTADatabase, device_id: &str) -> Result<()> {
+async fn dissociate_device(db: &OTADatabase, device_id: &str) -> Result<(), Error> {
     // Delete entry from dB
     db.devices.remove(&device_id)?;
     db.devices.flush_async().await?;
@@ -460,7 +466,7 @@ async fn dissociate_device(db: &OTADatabase, device_id: &str) -> Result<()> {
     Ok(())
 }
 
-async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<()> {
+async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<(), Error> {
     // Delete entry from dB
     db.groups.remove(&group_id)?;
     db.groups.flush_async().await?;
@@ -468,7 +474,7 @@ async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<()> {
     Ok(())
 }
 
-async fn delete_all_ota_data(db: &OTADatabase, settings: &settings::Ota) -> Result<()> {
+async fn delete_all_ota_data(db: &OTADatabase, settings: &settings::Ota) -> Result<(), Error> {
     // Clear them first
     db.images.clear()?;
     db.images.flush_async().await?;
@@ -483,7 +489,7 @@ async fn associate_device_with_group(
     db: &OTADatabase,
     device_id: &str,
     group_id: &str,
-) -> Result<()> {
+) -> Result<(), Error> {
     // Insert the encoded data back into the db
     db.devices.insert(&device_id, group_id.as_bytes())?;
     db.devices.flush_async().await?;
@@ -496,7 +502,7 @@ async fn associate_group_with_update(
     db: &OTADatabase,
     group_id: &str,
     update_id: &str,
-) -> Result<()> {
+) -> Result<(), Error> {
     // Check if insert worked ok
     db.groups.insert(&group_id, update_id.as_bytes())?;
     db.groups.flush_async().await?;
@@ -513,7 +519,7 @@ pub async fn save_ota_firmware_image(
     folder_path: &str,
     name: &str,
     image: &OTAImageData,
-) -> Result<()> {
+) -> Result<(), Error> {
     let base_path = format!("{}/{}", folder_path, name);
 
     log::debug!("Base path: {}", base_path);
@@ -542,7 +548,7 @@ pub async fn save_ota_firmware_image(
     Ok(())
 }
 
-pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
+pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<(), Error> {
     // Delete the folder from the filesystem
     fs::remove_dir_all(format!("{}/{}/", path, &name))?;
 
@@ -552,11 +558,11 @@ pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<()> {
 /// Creates the OTA package in the database and filesystem.
 ///
 /// This function overwrites any updates that may exist
-pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()> {
+pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<(), Error> {
     // Get the package
     let package = match &update.package {
         Some(p) => p,
-        None => return Err(anyhow!("Package must exist!")),
+        None => return Err(Error::CustomError(format!("Package must exist!"))),
     };
 
     // Generate the update ID
@@ -573,7 +579,7 @@ pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<()
 }
 
 /// Deletes the OTA package from the database and filesystem.
-pub async fn delete_ota_package(db: &OTADatabase, update_id: &str) -> Result<()> {
+pub async fn delete_ota_package(db: &OTADatabase, update_id: &str) -> Result<(), Error> {
     // Delete entry from dB
     db.images.remove(&update_id)?;
     db.images.flush_async().await?;

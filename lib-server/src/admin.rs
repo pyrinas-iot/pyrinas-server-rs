@@ -18,6 +18,9 @@ use pyrinas_shared::{ota::OtaVersion, ManagmentDataType};
 // Cbor
 use serde_cbor;
 
+// Error
+use crate::Error;
+
 pub type AdminClient = Arc<Mutex<Option<Sender<Result<Message, warp::Error>>>>>;
 
 // Handle the incoming connection
@@ -151,7 +154,10 @@ async fn handle_connection(
 }
 
 // Only requires a sender. No response necessary here... yet.
-pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> anyhow::Result<()> {
+pub async fn run(
+    settings: &settings::Admin,
+    broker_sender: Sender<Event>,
+) -> Result<(), Error> {
     // Get the sender/reciever associated with this particular task
     let (sender, receiver) = unbounded::<Event>();
 

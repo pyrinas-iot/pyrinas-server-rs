@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use crate::Error;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
@@ -46,7 +46,7 @@ pub struct PyrinasSettings {
 }
 
 impl PyrinasSettings {
-    pub fn new(config: String) -> Result<Self> {
+    pub fn new(config: String) -> Result<Self, Error> {
         // Get the path
         let path = Path::new(&config);
 
@@ -56,7 +56,10 @@ impl PyrinasSettings {
         // Get the actual config
         match toml::from_str(&config) {
             Ok(settings) => Ok(settings),
-            Err(e) => Err(anyhow!("Unable to deserialize TOML: {}", e)),
+            Err(e) => Err(Error::CustomError(format!(
+                "Unable to deserialize TOML: {}",
+                e
+            ))),
         }
     }
 }

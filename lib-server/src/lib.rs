@@ -15,7 +15,7 @@ use influxdb::{ReadQuery, WriteQuery};
 // Async Related
 use flume::{Receiver, Sender};
 use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned, OtaVersion};
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 // Runtime
 use tokio::task;
@@ -23,12 +23,74 @@ use tokio::task;
 // MQTT related
 use librumqttd::async_locallink::construct_broker;
 
+// Error
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("{source}")]
+    SendError {
+        #[from]
+        source: flume::SendError<Event>,
+    },
+
+    // #[error("{source}")]
+    // TokioError {
+    //     #[from]
+    //     source: tokio::Error,
+    // },
+    #[error("{source}")]
+    MqttError {
+        #[from]
+        source: librumqttd::Error,
+    },
+
+    #[error("{source}")]
+    MqttLinkError {
+        #[from]
+        source: librumqttd::async_locallink::LinkError,
+    },
+
+    #[error("{source}")]
+    CborError {
+        #[from]
+        source: serde_cbor::Error,
+    },
+
+    #[error("{source}")]
+    SledError {
+        #[from]
+        source: sled::Error,
+    },
+
+    #[error("{source}")]
+    StringConversionError {
+        #[from]
+        source: std::string::FromUtf8Error,
+    },
+
+    #[error("{source}")]
+    IoError {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("{source}")]
+    TokioTaskError {
+        #[from]
+        source: tokio::task::JoinError,
+    },
+
+    #[error("err: {0}")]
+    CustomError(String),
+}
+
 // TODO: conditional use of tokio OR async_std
 pub async fn run(
     settings: Arc<settings::PyrinasSettings>,
     broker_sender: Sender<Event>,
     broker_reciever: Receiver<Event>,
-) -> anyhow::Result<()> {
+) -> Result<(), Error> {
     // Clone these appropriately
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
@@ -82,10 +144,10 @@ pub async fn run(
     });
 
     // Get the rx/tx channels
-    let (mut tx, mut rx) = builder.connect("localclient", 200).await.unwrap();
+    let (mut tx, mut rx) = builder.connect("localclient", 200).await?;
 
     // Subscribe
-    tx.subscribe(settings.mqtt.topics.clone()).await.unwrap();
+    tx.subscribe(settings.mqtt.topics.clone()).await?;
 
     // Spawn a new task(s) for the MQTT stuff
     let task_sender = broker_sender.clone();
