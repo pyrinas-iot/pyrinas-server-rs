@@ -94,7 +94,7 @@ pub enum CertSubcommand {
 #[derive(Clap, Debug)]
 #[clap(version = crate_version!())]
 pub struct CertDevice {
-    /// Id of the device (usually IMEI)
+    /// ID of the device (usually IMEI). Obtains from device if not provided.
     id: Option<String>,
     /// Automatic provision
     #[clap(long, short)]
@@ -103,7 +103,7 @@ pub struct CertDevice {
     #[clap(default_value = certs::DEFAULT_MAC_PORT )]
     port: String,
     /// Security tag for provisioning
-    #[clap(default_value = certs::DEFAULT_MAC_PORT )]
+    #[clap(default_value = certs::DEFAULT_PYRINAS_SECURITY_TAG )]
     tag: String,
 }
 

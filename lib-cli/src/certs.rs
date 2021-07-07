@@ -189,7 +189,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     // AT%CMNG=0,16842753,0,""
                     if let Err(e) = port.write_fmt(format_args!(
                         "AT%CMNG=0,{},0,\"{}\"\r\n",
-                        DEFAULT_PYRINAS_SECURITY_TAG, &certs.ca_cert
+                        &cmd.tag, &certs.ca_cert
                     )) {
                         return Err(Error::CustomError(format!(
                             "Unable to write CA cert. Error: {}",
@@ -279,6 +279,7 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
     // Get the path
     let ca_der_path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
     let ca_private_der_path = format!("{}/certs/{}/ca/ca.key.der", config_path, config.domain);
+    let ca_pem_path = format!("{}/certs/{}/ca/ca.pem", config_path, config.domain);
 
     // Check if CA exits
     if std::path::Path::new(&ca_der_path).exists() {
@@ -309,6 +310,7 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
 
     fs::write(ca_der_path, &ca_cert.serialize_der().unwrap())?;
     fs::write(ca_private_der_path, &ca_cert.serialize_private_key_der())?;
+    fs::write(ca_pem_path, &ca_cert.serialize_pem().unwrap())?;
 
     println!("Exported CA to {}", config_path);
 
@@ -510,7 +512,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let cert = Certificate::from_params(params)?;
 
     // Write cert to file(s)
-    // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
+    write_keypair_pem(&config, &name, &cert, &ca_cert)?;
 
     // Write pfx
     write_pfx(&config, &name, &cert, &ca_cert, &ca_der)?;
