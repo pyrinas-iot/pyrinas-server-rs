@@ -4,7 +4,7 @@ use ota::{v2::OTAPackage, OtaVersion};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
-use clap::{crate_version, Clap};
+use clap::Parser;
 
 // Modules
 pub mod ota;
@@ -85,8 +85,8 @@ pub struct ApplicationData {
 }
 
 /// Used to associate
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[clap(version)]
 pub struct OtaAssociate {
     /// Device Id
     pub device_id: Option<String>,

@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-cli"
-version = "0.4.1"
+version = "0.4.2"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -14,22 +14,25 @@ name = "pyrinas"
 path = "src/bin/example/cli.rs"
 
 [dependencies]
-pem = "0.8"
-rcgen = { git="https://github.com/est31/rcgen.git", branch="master", features=["x509-parser", "pem"] } # Used to generate certs
+pem = "1.0"
+rcgen = { version = "0.8", features = [
+    "x509-parser",
+    "pem",
+] } # Used to generate certs
 chrono = "0.4" # Tracking time
-clap = "3.0.0-beta.2" # CLI Library (Needed?)
-env_logger = "0.8" # logging message control using env variable
+clap = "3.0" # CLI Library (Needed?)
+env_logger = "0.9" # logging message control using env variable
 log = "0.4" # logging messages
-pyrinas-shared = { path="../lib-shared/" }
-serde = { version="1.0", features=["derive"] } # Serializing/deserializing  
+pyrinas-shared = { path = "../lib-shared/" }
+serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing  
 serde_json = "^1.0" # For serialization of json
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
 thiserror = "1.0" # Error handling
 home = "0.5.3" # Get home directory 
 toml = "0.5.8" # Serializing/deserializing configuration
-tungstenite = "0.13.0" # Websocket client
+tungstenite = "0.16.0" # Websocket client
 git2 = "0.13.17" # Git describe for getting version
-semver = "0.11" # Parsing version string
-p12 = "0.2" # Used for creating .pfx file
+semver = "1.0" # Parsing version string
+p12 = "0.4" # Used for creating .pfx file
 serialport = "4" # Connecting to serial port
 promptly = "0.3.0" # Prompt

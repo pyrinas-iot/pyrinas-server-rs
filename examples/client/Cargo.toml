@@ -1,6 +1,6 @@
 [package]
 name = "pyrinas-client-example"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 
@@ -11,10 +11,10 @@ path = "src/bin/client.rs"
 [dependencies]
 pyrinas-codec-example = { version = "0.1", path = "../../lib-codec-example/" }
 
-rumqttc = { git = "https://github.com/jaredwolff/rumqtt", branch = "adding-server-login-credential-check" } # Mqtt client bits
+rumqttc = { version = "0.10.0" } # Mqtt client bits
 
-clap = "3.0.0-beta.2" # CLI Library
+clap = "3.0"                # CLI Library
 tokio = { version = "1.0" } # async runtime
 
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
-serde_cbor = "0.11" # Serde specific CBOR serialize/deserialze
+serde_cbor = "0.11"                                # Serde specific CBOR serialize/deserialze

@@ -12,9 +12,10 @@ use serde_cbor;
 // Std lib
 use std::fs::File;
 use std::io::{self, prelude::*};
+use std::net::TcpStream;
 
 // Websocket
-use tungstenite::{client::AutoStream, protocol::WebSocket, Message};
+use tungstenite::{protocol::WebSocket, stream::MaybeTlsStream, Message};
 
 // Error handling
 use thiserror::Error;
@@ -56,7 +57,10 @@ pub enum Error {
 }
 
 /// Functon for processing all incoming OTA commands.
-pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Result<(), Error> {
+pub fn process(
+    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    cmd: &OtaSubCommand,
+) -> Result<(), Error> {
     match cmd {
         OtaSubCommand::Add(a) => {
             let image_id = crate::ota::add_ota(socket, a.force)?;
@@ -184,7 +188,10 @@ pub fn process(socket: &mut WebSocket<AutoStream>, cmd: &OtaSubCommand) -> Resul
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String, Error> {
+pub fn add_ota(
+    stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    force: bool,
+) -> Result<String, Error> {
     // Get the current version using 'git describe'
     let ver = crate::git::get_git_describe()?;
 
@@ -243,7 +250,7 @@ pub fn add_ota(stream: &mut WebSocket<AutoStream>, force: bool) -> Result<String
 }
 
 pub fn associate(
-    stream: &mut WebSocket<AutoStream>,
+    stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     associate: &OtaAssociate,
 ) -> Result<(), Error> {
     // Then configure the outer data
@@ -263,7 +270,10 @@ pub fn associate(
 }
 
 /// Adds and OTA image from an included manifest file to the server
-pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &str) -> Result<(), Error> {
+pub fn remove_ota(
+    stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    image_id: &str,
+) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::RemoveOta,
@@ -280,7 +290,7 @@ pub fn remove_ota(stream: &mut WebSocket<AutoStream>, image_id: &str) -> Result<
     Ok(())
 }
 
-pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), Error> {
+pub fn get_ota_group_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::GetGroupList,
@@ -297,7 +307,7 @@ pub fn get_ota_group_list(stream: &mut WebSocket<AutoStream>) -> Result<(), Erro
     Ok(())
 }
 
-pub fn get_ota_image_list(stream: &mut WebSocket<AutoStream>) -> Result<(), Error> {
+pub fn get_ota_image_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
         cmd: ManagmentDataType::GetImageList,

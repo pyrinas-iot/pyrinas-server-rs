@@ -33,7 +33,7 @@ pub enum GitError {
     #[error("semver error: {source}")]
     SemVerError {
         #[from]
-        source: semver::SemVerError,
+        source: semver::Error,
     },
 
     #[error("unable to convert hash")]

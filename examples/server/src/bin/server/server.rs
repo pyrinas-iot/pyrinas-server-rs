@@ -7,14 +7,14 @@ use std::sync::Arc;
 use tokio::task;
 
 // Command line parsing
-use clap::{crate_version, Clap};
+use clap::Parser;
 
 // Local crate related
 use pyrinas_server::{self, settings, Event};
 
 /// Pyrinas server
-#[derive(Clap)]
-#[clap(version = crate_version!())]
+#[derive(Parser)]
+#[clap(version)]
 struct Opts {
     config: String,
 }
@@ -25,7 +25,7 @@ async fn main() {
     env_logger::init();
 
     // Print out info
-    log::info!("Pyrinas Server Version: {}", crate_version!());
+    log::info!("Pyrinas Server");
 
     // Get the config path
     let opts: Opts = Opts::parse();

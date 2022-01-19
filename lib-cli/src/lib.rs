@@ -4,16 +4,16 @@ pub mod device;
 pub mod git;
 pub mod ota;
 
-use clap::{crate_version, Clap};
+use clap::Parser;
 use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
 use serde::{Deserialize, Serialize};
-use std::num;
+use std::{net::TcpStream, num};
 
 // Error handling
 use thiserror::Error;
 
 // Websocket
-use tungstenite::{client::AutoStream, http, http::Request, protocol::WebSocket};
+use tungstenite::{http, http::Request, protocol::WebSocket, stream::MaybeTlsStream};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -38,7 +38,7 @@ pub enum Error {
     #[error("semver error: {source}")]
     SemVerError {
         #[from]
-        source: semver::SemVerError,
+        source: semver::Error,
     },
 
     #[error("parse error: {source}")]
@@ -64,23 +64,23 @@ pub enum Error {
 }
 
 /// Various commands related to the OTA process
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub struct OtaCmd {
     #[clap(subcommand)]
     pub subcmd: OtaSubCommand,
 }
 
 /// Commands related to certs
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub struct CertCmd {
     #[clap(subcommand)]
     pub subcmd: CertSubcommand,
 }
 
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub enum CertSubcommand {
     /// Generate CA cert
     Ca,
@@ -91,8 +91,8 @@ pub enum CertSubcommand {
 }
 
 /// Remove a OTA package from the sever
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub struct CertDevice {
     /// ID of the device (usually IMEI). Obtains from device if not provided.
     id: Option<String>,
@@ -107,8 +107,8 @@ pub struct CertDevice {
     tag: String,
 }
 
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub enum OtaSubCommand {
     /// Add OTA package
     Add(OtaAdd),
@@ -123,8 +123,8 @@ pub enum OtaSubCommand {
 }
 
 /// Add a OTA package from the sever
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub struct OtaAdd {
     /// Force updating in dirty repository
     #[clap(long, short)]
@@ -139,8 +139,8 @@ pub struct OtaAdd {
 }
 
 /// Remove a OTA package from the sever
-#[derive(Clap, Debug)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug)]
+#[clap(version)]
 pub struct OtaRemove {
     /// Image id to be directed to
     pub image_id: String,
@@ -174,23 +174,23 @@ pub struct Config {
 }
 
 /// Configuration related commands
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[clap(version)]
 pub struct ConfigCmd {
     #[clap(subcommand)]
     pub subcmd: ConfigSubCommand,
 }
 
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[clap(version)]
 pub enum ConfigSubCommand {
     Show(Show),
     Init,
 }
 
 /// Show current configuration
-#[derive(Clap, Debug, Serialize, Deserialize)]
-#[clap(version = crate_version!())]
+#[derive(Parser, Debug, Serialize, Deserialize)]
+#[clap(version)]
 pub struct Show {}
 
 // Struct that gets serialized for OTA support
@@ -221,7 +221,7 @@ pub struct OTAManifest {
 //     Ok(out.to_string())
 // }
 
-pub fn get_socket(config: &Config) -> Result<WebSocket<AutoStream>, Error> {
+pub fn get_socket(config: &Config) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, Error> {
     if !config.secure {
         println!("WARNING! Not using secure web socket connection!");
     }

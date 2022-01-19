@@ -3,10 +3,10 @@ use rumqttc::{self, AsyncClient, MqttOptions, QoS};
 use std::time::Duration;
 
 // Command line parsing
-use clap::{crate_version, Clap};
+use clap::Parser;
 
-#[derive(Clap)]
-#[clap(version = crate_version!())]
+#[derive(Parser)]
+#[clap(version)]
 struct Opts {
     address: String,
     port: u16,
@@ -19,7 +19,7 @@ async fn main() {
 
     // Set up client
     let mut mqttoptions = MqttOptions::new("pyrinas-client-example", opts.address, opts.port);
-    mqttoptions.set_keep_alive(5);
+    mqttoptions.set_keep_alive(Duration::from_secs(5));
 
     // Connect
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);

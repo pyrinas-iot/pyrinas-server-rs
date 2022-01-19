@@ -15,15 +15,25 @@ pub struct TrackerGpsInfluxReport {
 }
 
 #[derive(Debug, InfluxDbWriteable, Clone)]
-pub struct TrackerRoamInfluxReport {
+pub struct TrackerDeviceInfluxReport {
     pub time: DateTime<Utc>,
     #[influxdb(tag)]
     pub id: String,
     pub rsrp: u16,
     pub area: u32,
-    pub mccmnc: u32,
+    pub mnc: u32,
+    pub mcc: u32,
     pub cell: u32,
     pub ip: String,
+    pub band: u16,
+    pub mode_gps: u16,
+    pub mode_lte: u16,
+    pub mode_nbiot: u16,
+    pub iccid: String,
+    pub modem_version: String,
+    pub board: String,
+    pub app_version: String,
+    pub vbat: u16,
 }
 
 #[derive(Debug, InfluxDbWriteable, Clone)]

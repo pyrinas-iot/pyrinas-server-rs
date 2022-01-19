@@ -1,18 +1,18 @@
-use clap::{crate_version, Clap};
+use clap::Parser;
 use pyrinas_cli::{ota, CertCmd, Error};
 use pyrinas_cli::{ConfigCmd, OtaCmd};
 
 /// Command line utility to communicate with Pyrinas server over
 /// a websockets connection.
-#[derive(Clap)]
-#[clap(version = crate_version!())]
+#[derive(Parser)]
+#[clap(version)]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
-#[clap(version = crate_version!())]
+#[derive(Parser)]
+#[clap(version)]
 enum SubCommand {
     Ota(OtaCmd),
     Config(ConfigCmd),
