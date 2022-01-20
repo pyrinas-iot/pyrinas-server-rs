@@ -60,8 +60,8 @@ pub async fn run(broker_reciever: Receiver<Event>) {
                     log::error!("{}", e);
                 }
             }
-            Event::OtaDissociate { .. }
-            | Event::OtaAssociate { .. }
+            Event::OtaUnlink { .. }
+            | Event::OtaLink { .. }
             | Event::OtaUpdateImageListRequest()
             | Event::OtaUpdateGroupListRequest()
             | Event::OtaDeletePackage(_)

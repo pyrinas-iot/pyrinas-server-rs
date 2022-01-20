@@ -162,7 +162,7 @@ pub async fn process_event(
             }
         }
 
-        Event::OtaDissociate {
+        Event::OtaUnlink {
             device_id,
             group_id,
         } => {
@@ -190,7 +190,7 @@ pub async fn process_event(
                 _ => {}
             };
         }
-        Event::OtaAssociate {
+        Event::OtaLink {
             device_id,
             group_id,
             image_id,

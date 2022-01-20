@@ -179,11 +179,11 @@ pub enum Event {
     },
     OtaDeletePackage(String),
     OtaNewPackage(OtaUpdate),
-    OtaDissociate {
+    OtaUnlink {
         device_id: Option<String>,
         group_id: Option<String>,
     },
-    OtaAssociate {
+    OtaLink {
         device_id: Option<String>,
         group_id: Option<String>,
         image_id: Option<String>,

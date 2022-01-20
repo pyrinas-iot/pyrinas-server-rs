@@ -20,7 +20,7 @@ use tungstenite::{protocol::WebSocket, stream::MaybeTlsStream, Message};
 // Error handling
 use thiserror::Error;
 
-use crate::{git, OtaAssociate, OtaSubCommand};
+use crate::{git, OtaLink, OtaSubCommand};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -70,16 +70,16 @@ pub fn process(
             // Do association
             match &a.device_id {
                 Some(device_id) => {
-                    let a = OtaAssociate {
+                    let a = OtaLink {
                         device_id: Some(device_id.clone()),
                         group_id: Some(device_id.to_string()),
                         image_id: Some(image_id),
                         ota_version: a.ota_version,
                     };
 
-                    crate::ota::associate(socket, &a)?;
+                    crate::ota::link(socket, &a)?;
 
-                    println!("Associated! {:?}", &a);
+                    println!("OTA Linked! {:?}", &a);
                 }
                 None => (),
             };
@@ -89,10 +89,15 @@ pub fn process(
 
             println!("{} successfully removed!", &r.image_id);
         }
-        OtaSubCommand::Associate(a) => {
-            crate::ota::associate(socket, &a)?;
+        OtaSubCommand::Unlink(a) => {
+            crate::ota::unlink(socket, &a)?;
 
-            println!("Associated! {:?}", &a);
+            println!("OTA Unlinked! {:?}", &a);
+        }
+        OtaSubCommand::Link(a) => {
+            crate::ota::link(socket, &a)?;
+
+            println!("OTA Linked! {:?}", &a);
         }
         OtaSubCommand::ListGroups => {
             crate::ota::get_ota_group_list(socket)?;
@@ -249,15 +254,35 @@ pub fn add_ota(
     Ok(package_version.to_string())
 }
 
-pub fn associate(
+pub fn unlink(
     stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
-    associate: &OtaAssociate,
+    link: &OtaLink,
 ) -> Result<(), Error> {
     // Then configure the outer data
     let msg = ManagementData {
-        cmd: ManagmentDataType::Associate,
+        cmd: ManagmentDataType::UnlinkOta,
         target: None,
-        msg: serde_cbor::to_vec(associate)?,
+        msg: serde_cbor::to_vec(link)?,
+    };
+
+    // If second encode looks good send it off
+    let data = serde_cbor::to_vec(&msg)?;
+
+    // Send over socket
+    stream.write_message(Message::binary(data))?;
+
+    Ok(())
+}
+
+pub fn link(
+    stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    link: &OtaLink,
+) -> Result<(), Error> {
+    // Then configure the outer data
+    let msg = ManagementData {
+        cmd: ManagmentDataType::LinkOta,
+        target: None,
+        msg: serde_cbor::to_vec(link)?,
     };
 
     // If second encode looks good send it off

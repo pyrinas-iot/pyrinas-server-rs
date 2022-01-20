@@ -42,8 +42,8 @@ pub enum ManagmentDataType {
     Application,
     AddOta,
     RemoveOta,
-    Associate,
-    Dissociate,
+    LinkOta,
+    UnlinkOta,
     GetGroupList,
     GetImageList,
 }
@@ -87,7 +87,7 @@ pub struct ApplicationData {
 /// Used to associate
 #[derive(Parser, Debug, Serialize, Deserialize)]
 #[clap(version)]
-pub struct OtaAssociate {
+pub struct OtaLink {
     /// Device Id
     pub device_id: Option<String>,
     /// Group Id

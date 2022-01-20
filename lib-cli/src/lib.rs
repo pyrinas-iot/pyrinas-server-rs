@@ -5,7 +5,7 @@ pub mod git;
 pub mod ota;
 
 use clap::Parser;
-use pyrinas_shared::{ota::OTAPackageVersion, OtaAssociate};
+use pyrinas_shared::{ota::OTAPackageVersion, OtaLink};
 use serde::{Deserialize, Serialize};
 use std::{net::TcpStream, num};
 
@@ -113,7 +113,9 @@ pub enum OtaSubCommand {
     /// Add OTA package
     Add(OtaAdd),
     /// Associate command
-    Associate(OtaAssociate),
+    Link(OtaLink),
+    /// Unlink from Device/Group
+    Unlink(OtaLink),
     /// Remove OTA package
     Remove(OtaRemove),
     /// List groups

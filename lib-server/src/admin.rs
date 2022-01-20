@@ -74,9 +74,9 @@ async fn handle_connection(
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");
             }
-            ManagmentDataType::Associate => {
+            ManagmentDataType::LinkOta => {
                 // Dedcode ota update
-                let a: pyrinas_shared::OtaAssociate =
+                let a: pyrinas_shared::OtaLink =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaAssociate");
 
                 let ver = match a.ota_version.try_into() {
@@ -86,7 +86,7 @@ async fn handle_connection(
 
                 // Send if decode was successful
                 let _ = broker_sender
-                    .send_async(Event::OtaAssociate {
+                    .send_async(Event::OtaLink {
                         device_id: a.device_id,
                         group_id: a.group_id,
                         image_id: a.image_id,
@@ -118,14 +118,14 @@ async fn handle_connection(
                     .await
                     .expect("Unable to send ApplicationManagementRequest to broker.");
             }
-            ManagmentDataType::Dissociate => {
+            ManagmentDataType::UnlinkOta => {
                 // Dedcode ota update
-                let a: pyrinas_shared::OtaAssociate =
+                let a: pyrinas_shared::OtaLink =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaAssociate");
 
                 // Send if decode was successful
                 let _ = broker_sender
-                    .send_async(Event::OtaDissociate {
+                    .send_async(Event::OtaUnlink {
                         device_id: a.device_id,
                         group_id: a.group_id,
                     })
