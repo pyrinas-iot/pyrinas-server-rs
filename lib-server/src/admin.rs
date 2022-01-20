@@ -77,7 +77,7 @@ async fn handle_connection(
             ManagmentDataType::LinkOta => {
                 // Dedcode ota update
                 let a: pyrinas_shared::OtaLink =
-                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaAssociate");
+                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
 
                 let ver = match a.ota_version.try_into() {
                     Ok(v) => v,
@@ -121,7 +121,7 @@ async fn handle_connection(
             ManagmentDataType::UnlinkOta => {
                 // Dedcode ota update
                 let a: pyrinas_shared::OtaLink =
-                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaAssociate");
+                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
 
                 // Send if decode was successful
                 let _ = broker_sender

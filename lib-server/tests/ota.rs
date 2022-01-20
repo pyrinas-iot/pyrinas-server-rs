@@ -479,7 +479,7 @@ async fn test_ota_request_assign_an_check() {
     ota::process_event(&settings, &sender, &db, &event).await;
 
     // Then assign the new image to a device
-    let event = Event::OtaAssociate {
+    let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
@@ -611,7 +611,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     ota::process_event(&settings, &sender, &db, &event).await;
 
     // Then assign the new image to a device
-    let event = Event::OtaAssociate {
+    let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
@@ -691,7 +691,7 @@ async fn test_ota_request_associate_and_dissociate() {
     ota::process_event(&settings, &sender, &db, &event).await;
 
     // Then assign the new image to a device
-    let event = Event::OtaAssociate {
+    let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
@@ -704,7 +704,7 @@ async fn test_ota_request_associate_and_dissociate() {
     receiver.recv().unwrap();
 
     // Then assign the new image to a device
-    let event = Event::OtaDissociate {
+    let event = Event::OtaUnlink {
         device_id: Some("1234".to_string()),
         group_id: None,
     };
