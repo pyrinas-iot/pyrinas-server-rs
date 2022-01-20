@@ -59,7 +59,7 @@ async fn handle_connection(
 
         // First deocde into ManagementRequest struct
         let req: pyrinas_shared::ManagementData =
-            serde_cbor::from_slice(&msg.as_bytes()).expect("Unable to deserialize ManagementData");
+            serde_cbor::from_slice(msg.as_bytes()).expect("Unable to deserialize ManagementData");
 
         // Next step in the managment request process
         match req.cmd {

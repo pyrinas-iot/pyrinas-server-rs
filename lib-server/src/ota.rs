@@ -117,7 +117,7 @@ pub async fn process_event(
                     log::debug!("Check!");
 
                     // Lookup
-                    let package = get_ota_package_by_device_id(&db, &device_id).ok();
+                    let package = get_ota_package_by_device_id(db, device_id).ok();
 
                     // Get version. No version? Must be v1
                     let version = match &msg.version {
@@ -169,21 +169,21 @@ pub async fn process_event(
             // Match the different possiblities
             match (&device_id, &group_id) {
                 (None, Some(g)) => {
-                    if dissociate_group(&db, &g).await.is_err() {
+                    if dissociate_group(db, g).await.is_err() {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
                 }
                 (Some(d), None) => {
-                    if dissociate_device(&db, &d).await.is_err() {
+                    if dissociate_device(db, d).await.is_err() {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
                 (Some(d), Some(g)) => {
-                    if dissociate_group(&db, &g).await.is_err() {
+                    if dissociate_group(db, g).await.is_err() {
                         log::warn!("Unable to disassociate group: {}", g);
                     }
 
-                    if dissociate_device(&db, &d).await.is_err() {
+                    if dissociate_device(db, d).await.is_err() {
                         log::warn!("Unable to disassociate device: {}", d);
                     }
                 }
@@ -200,7 +200,7 @@ pub async fn process_event(
             match (&device_id, &group_id, &image_id) {
                 (None, Some(group), Some(update)) => {
                     // Connect group -> image
-                    if let Err(err) = associate_group_with_update(&db, &group, &update).await {
+                    if let Err(err) = associate_group_with_update(db, group, update).await {
                         log::error!(
                             "Unable to associate {} with {}. Err: {}",
                             group,
@@ -212,7 +212,7 @@ pub async fn process_event(
                 }
                 (Some(device), Some(group), None) => {
                     // connect device -> group
-                    if let Err(err) = associate_device_with_group(&db, &device, &group).await {
+                    if let Err(err) = associate_device_with_group(db, device, group).await {
                         log::error!(
                             "Unable to associate {} with {}. Err: {}",
                             device,
@@ -224,7 +224,7 @@ pub async fn process_event(
                 }
                 (Some(device), Some(group), Some(update)) => {
                     // connect device -> group
-                    if let Err(err) = associate_device_with_group(&db, &device, &group).await {
+                    if let Err(err) = associate_device_with_group(db, device, group).await {
                         log::error!(
                             "Unable to associate {} with {}. Err: {}",
                             device,
@@ -235,7 +235,7 @@ pub async fn process_event(
                     }
 
                     // connect group -> image
-                    if let Err(err) = associate_group_with_update(&db, &group, &update).await {
+                    if let Err(err) = associate_group_with_update(db, group, update).await {
                         log::error!(
                             "Unable to associate {} with {}. Err: {}",
                             group,
@@ -260,7 +260,7 @@ pub async fn process_event(
             // TODO: done in a separate function call?
             if let Some(device) = device_id {
                 // Gather update information and then send it off to the device
-                let package = match get_ota_package_by_device_id(&db, &device) {
+                let package = match get_ota_package_by_device_id(db, device) {
                     Ok(p) => p,
                     Err(e) => {
                         log::warn!("Unable to get OTA package: Error: {}", e);
@@ -326,7 +326,7 @@ pub async fn process_event(
             // Save each of the images with the type attached to it as well.
             for image in images {
                 if let Err(e) =
-                    save_ota_firmware_image(&settings.image_path, &update_id, &image).await
+                    save_ota_firmware_image(&settings.image_path, &update_id, image).await
                 {
                     log::error!("Unable to save OTA firmware image. Err: {}", e);
                     return;
@@ -351,29 +351,27 @@ pub async fn process_event(
             };
 
             // Save the OTA package to database
-            if let Err(e) = save_ota_package(&db, &update).await {
+            if let Err(e) = save_ota_package(db, &update).await {
                 log::error!("Unable to save OTA package. Error: {}", e);
-                return;
             }
         }
         Event::OtaDeletePackage(update_id) => {
             match update_id.as_str() {
                 // Delete all option
                 "*" => {
-                    if let Err(e) = delete_all_ota_data(&db, &settings).await {
+                    if let Err(e) = delete_all_ota_data(db, settings).await {
                         log::warn!("Unable to delete all ota data. Err: {}", e);
                     }
                 }
                 // Delete a signle update
                 _ => {
                     // Delete by ID
-                    if let Err(e) = delete_ota_package(&db, &update_id).await {
+                    if let Err(e) = delete_ota_package(db, update_id).await {
                         log::warn!("Unable to remove ota package for {}. Err: {}", update_id, e);
                     };
 
                     // Delete folder
-                    if let Err(e) =
-                        delete_ota_firmware_image(&settings.image_path, &update_id).await
+                    if let Err(e) = delete_ota_firmware_image(&settings.image_path, update_id).await
                     {
                         log::warn!("Unable to removed files for {}. Err: {}", update_id, e);
                     }

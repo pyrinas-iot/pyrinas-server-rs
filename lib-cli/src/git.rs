@@ -72,7 +72,7 @@ pub fn get_git_describe() -> Result<String, GitError> {
         .dirty_suffix("-dirty");
 
     // Describe string!
-    let des = repo.describe(&opts)?.format(Some(&desc_format_opts))?;
+    let des = repo.describe(opts)?.format(Some(&desc_format_opts))?;
 
     Ok(des)
 }

@@ -429,13 +429,13 @@ fn write_pfx(
     // Create directory if not already
     std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
 
-    let cert_der = cert.serialize_der_with_signer(&ca_cert)?;
+    let cert_der = cert.serialize_der_with_signer(ca_cert)?;
     let key_der = cert.serialize_private_key_der();
 
     // Serialize ca_der as bytes without re-signing..
 
     // Generate pfx file!
-    let ca_pfx = PFX::new(&cert_der, &key_der, Some(&ca_der), &config.pfx_pass, &name)
+    let ca_pfx = PFX::new(&cert_der, &key_der, Some(ca_der), &config.pfx_pass, name)
         .ok_or(Error::PfxGen)?
         .to_der()
         .to_vec();
@@ -512,10 +512,10 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let cert = Certificate::from_params(params)?;
 
     // Write cert to file(s)
-    write_keypair_pem(&config, &name, &cert, &ca_cert)?;
+    write_keypair_pem(config, &name, &cert, &ca_cert)?;
 
     // Write pfx
-    write_pfx(&config, &name, &cert, &ca_cert, &ca_der)?;
+    write_pfx(config, &name, &cert, &ca_cert, &ca_der)?;
 
     println!("Exported server .pfx to {}", config_path);
 
@@ -572,7 +572,7 @@ pub fn generate_device_cert(
     // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
 
     // Write nRF Connect Desktop compatable JSON for cert install
-    let certs = write_device_json(&config, &name, &cert, &ca_cert, &ca_der)?;
+    let certs = write_device_json(config, name, &cert, &ca_cert, &ca_der)?;
 
     println!("Exported cert for {} to {}", name, device_cert_path);
 

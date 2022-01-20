@@ -90,12 +90,12 @@ pub fn process(
             println!("{} successfully removed!", &r.image_id);
         }
         OtaSubCommand::Unlink(a) => {
-            crate::ota::unlink(socket, &a)?;
+            crate::ota::unlink(socket, a)?;
 
-            println!("OTA Unlinked! {:?}", &a);
+            println!("OTA Unlinked! {:?}", a);
         }
         OtaSubCommand::Link(a) => {
-            crate::ota::link(socket, &a)?;
+            crate::ota::link(socket, a)?;
 
             println!("OTA Linked! {:?}", &a);
         }
