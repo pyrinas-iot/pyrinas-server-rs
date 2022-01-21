@@ -6,7 +6,7 @@ use rcgen::{
     BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa,
     KeyUsagePurpose, SanType,
 };
-use serialport;
+use serialport::{self, SerialPort};
 use std::{
     convert::TryInto,
     fs::{self, File},
@@ -15,13 +15,13 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::{config, ota, CertCmd, CertConfig, CertSubcommand};
+use crate::{config, ota, CertCmd, CertConfig, CertEntry, CertSubcommand};
 
 /// Default serial port for MAC
 pub const DEFAULT_MAC_PORT: &str = "/dev/tty.SLAB_USBtoUART";
 
 /// Default security tag for Pyrinas
-pub const DEFAULT_PYRINAS_SECURITY_TAG: &str = "1234";
+pub const DEFAULT_PYRINAS_SECURITY_TAG: u32 = 1234;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -105,6 +105,94 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     params
 }
 
+fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<(), Error> {
+    // Get the reader
+    let mut reader = BufReader::new(port.try_clone()?);
+
+    // Set the ca certificate..
+    // AT%CMNG=0,16842753,0,""
+    if let Some(ca_cert) = &cert.ca_cert {
+        if let Err(e) = port.write_fmt(format_args!(
+            "AT%CMNG=0,{},0,\"{}\"\r\n",
+            &cert.tag, &ca_cert
+        )) {
+            return Err(Error::CustomError(format!(
+                "Unable to write CA cert. Error: {}",
+                e
+            )));
+        }
+
+        // Flush output
+        let _ = port.flush();
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+
+        // Delay
+        thread::sleep(time::Duration::from_secs(2));
+    }
+
+    // Write the public key
+    if let Some(pub_key) = &cert.pub_key {
+        // AT%CMNG=0,16842753,1,""
+        if let Err(e) = port.write_fmt(format_args!(
+            "AT%CMNG=0,{},1,\"{}\"\r\n",
+            &cert.tag, pub_key
+        )) {
+            return Err(Error::CustomError(format!(
+                "Unable to write client cert. Error: {}",
+                e
+            )));
+        }
+
+        // Flush output
+        let _ = port.flush();
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+
+        // Delay
+        thread::sleep(time::Duration::from_secs(2));
+    }
+
+    // AT%CMNG=0,16842753,2,""
+    if let Some(private_key) = &cert.private_key {
+        if let Err(e) = port.write_fmt(format_args!(
+            "AT%CMNG=0,{},2,\"{}\"\r\n",
+            cert.tag, private_key
+        )) {
+            //
+            return Err(Error::CustomError(format!(
+                " Unable to write private key. Error: {}",
+                e
+            )));
+        }
+
+        // Flush output
+        let _ = port.flush();
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Function used to process all incoming certification generation commands
 pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
     match &c.subcmd {
@@ -185,80 +273,21 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
 
                 // confirm provision
                 if prompt_default("Ready to provision to device. Continue?", false)? {
-                    // Set the certificate..
-                    // AT%CMNG=0,16842753,0,""
-                    if let Err(e) = port.write_fmt(format_args!(
-                        "AT%CMNG=0,{},0,\"{}\"\r\n",
-                        &cmd.tag, &certs.ca_cert
-                    )) {
-                        return Err(Error::CustomError(format!(
-                            "Unable to write CA cert. Error: {}",
-                            e
-                        )));
-                    }
+                    // Device default cert
+                    write_credential(
+                        &mut port,
+                        &CertEntry {
+                            tag: cmd.tag.unwrap_or(DEFAULT_PYRINAS_SECURITY_TAG),
+                            ca_cert: Some(certs.ca_cert),
+                            private_key: Some(certs.private_key),
+                            pub_key: Some(certs.client_cert),
+                        },
+                    )?;
 
-                    // Flush output
-                    let _ = port.flush();
-
-                    // Get the reader
-                    let mut reader = BufReader::new(port.try_clone()?);
-
-                    // Wait for "OK" response
-                    loop {
-                        let mut line = String::new();
-                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
-                            break;
-                        }
-                    }
-
-                    // Delay
-                    thread::sleep(time::Duration::from_secs(2));
-
-                    // AT%CMNG=0,16842753,1,""
-                    if let Err(e) = port.write_fmt(format_args!(
-                        "AT%CMNG=0,{},1,\"{}\"\r\n",
-                        DEFAULT_PYRINAS_SECURITY_TAG, certs.client_cert
-                    )) {
-                        return Err(Error::CustomError(format!(
-                            "Unable to write client cert. Error: {}",
-                            e
-                        )));
-                    }
-
-                    // Flush output
-                    let _ = port.flush();
-
-                    // Wait for "OK" response
-                    loop {
-                        let mut line = String::new();
-                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
-                            break;
-                        }
-                    }
-
-                    // Delay
-                    thread::sleep(time::Duration::from_secs(2));
-
-                    // AT%CMNG=0,16842753,2,""
-                    if let Err(e) = port.write_fmt(format_args!(
-                        "AT%CMNG=0,{},2,\"{}\"\r\n",
-                        DEFAULT_PYRINAS_SECURITY_TAG, certs.private_key
-                    )) {
-                        //
-                        return Err(Error::CustomError(format!(
-                            " Unable to write private key. Error: {}",
-                            e
-                        )));
-                    }
-
-                    // Flush output
-                    let _ = port.flush();
-
-                    // Wait for "OK" response
-                    loop {
-                        let mut line = String::new();
-                        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
-                            break;
+                    // Other certs as necessary
+                    if let Some(alts) = &config.alts {
+                        for entry in alts {
+                            write_credential(&mut port, entry)?;
                         }
                     }
 

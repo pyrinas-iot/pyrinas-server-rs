@@ -100,11 +100,11 @@ pub struct CertDevice {
     #[clap(long, short)]
     provision: bool,
     /// Serial port
-    #[clap(default_value = certs::DEFAULT_MAC_PORT )]
+    #[clap(long, default_value = certs::DEFAULT_MAC_PORT )]
     port: String,
     /// Security tag for provisioning
-    #[clap(default_value = certs::DEFAULT_PYRINAS_SECURITY_TAG )]
-    tag: String,
+    #[clap(long, short)]
+    tag: Option<u32>,
 }
 
 #[derive(Parser, Debug)]
@@ -160,6 +160,18 @@ pub struct CertConfig {
     pub pfx_pass: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct CertEntry {
+    /// tag number
+    pub tag: u32,
+    /// ca cert
+    pub ca_cert: Option<String>,
+    /// private key
+    pub private_key: Option<String>,
+    /// pub key
+    pub pub_key: Option<String>,
+}
+
 /// Config that can be installed locally
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -173,6 +185,8 @@ pub struct Config {
     pub authkey: String,
     /// Server cert configuration
     pub cert: CertConfig,
+    /// Alternative Certs to program to provisioned devices
+    pub alts: Option<Vec<CertEntry>>,
 }
 
 /// Configuration related commands
