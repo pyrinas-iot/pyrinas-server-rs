@@ -6,7 +6,7 @@ version = "0.4.4"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
-readme = "https://raw.githubusercontent.com/pyrinas-iot/pyrinas-server-rs/main/Readme.md"
+readme = "Readme.md"
 keywords = ["ota", "mqtt", "iot"]
 
 [[bin]]
@@ -14,6 +14,7 @@ name = "pyrinas"
 path = "src/bin/example/cli.rs"
 
 [dependencies]
+pyrinas-shared = { version = "0.3.2", path = "../lib-shared/" }
 pem = "1.0"
 rcgen = { version = "0.8", features = [
     "x509-parser",
@@ -23,7 +24,6 @@ chrono = "0.4" # Tracking time
 clap = "3.0" # CLI Library (Needed?)
 env_logger = "0.9" # logging message control using env variable
 log = "0.4" # logging messages
-pyrinas-shared = { path = "../lib-shared/" }
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing  
 serde_json = "^1.0" # For serialization of json
 serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze

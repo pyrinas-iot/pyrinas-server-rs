@@ -6,18 +6,18 @@ version = "0.4.2"
 license = "Apache-2.0"
 description = "IoT Server with built-in OTA support and data logging capabilities."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
-readme = "https://raw.githubusercontent.com/pyrinas-iot/pyrinas-server-rs/main/Readme.md"
+readme = "Readme.md"
 keywords = ["ota", "mqtt", "iot"]
 
 [features]
 default = []
 
 [dependencies]
+pyrinas-shared = { version = "0.3.2", path = "../lib-shared/" } # Local shared for settings, etc 
 clap = "3.0" # CLI Library
 env_logger = "0.9" # logging message control using env variable
 influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
 log = "0.4" # logging messages
-pyrinas-shared = { path = "../lib-shared/" } # Local shared for settings, etc 
 rumqttd = { version = "0.9.0", default-features = false, features = [
     "use-native-tls",
 ] } # Mqtt core bits

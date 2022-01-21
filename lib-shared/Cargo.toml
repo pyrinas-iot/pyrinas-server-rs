@@ -6,7 +6,7 @@ version = "0.3.2"
 license = "Apache-2.0"
 description = "Shared files between Pyrinas CLI and Pyrinas Server."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
-readme = "https://raw.githubusercontent.com/pyrinas-iot/pyrinas-server-rs/main/Readme.md"
+readme = "Readme.md"
 keywords = ["ota", "mqtt", "iot"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
