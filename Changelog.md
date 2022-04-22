@@ -2,10 +2,11 @@
 
 All notable changes to this project will be documented in this file. This file adheres to the format of [keep a changelog.](https://keepachangelog.com/en/1.0.0/)
 
-## [Unreleased]
+## [0.4.3]
 
-### Changed
+### Changed - 4/22/2022
 
+* Allow configuration of use of rustls vs native-tls
 * Config install changed to config init
 * Change target ManagmentDataType so it can be used in more depth on other servers
 * Bucket ota commands together so they can be reused elsewhere.
