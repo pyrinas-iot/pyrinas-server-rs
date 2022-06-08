@@ -5,5 +5,5 @@ pub struct DeviceCert {
     pub client_id: String,
     pub ca_cert: String,
     pub private_key: String,
-    pub client_cert: String,
+    pub public_key: String,
 }

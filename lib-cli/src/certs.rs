@@ -1,17 +1,21 @@
-use chrono::{Datelike, Utc};
-use p12::PFX;
-use pem::Pem;
-use promptly::prompt_default;
-use rcgen::{
-    BasicConstraints, Certificate, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa,
-    KeyUsagePurpose, SanType,
+use openssl::asn1::Asn1Time;
+use openssl::bn::{BigNum, MsbOption};
+use openssl::error::ErrorStack;
+use openssl::hash::MessageDigest;
+use openssl::pkey::{PKey, PKeyRef, Private};
+use openssl::rsa::Rsa;
+use openssl::x509::extension::{
+    AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectAlternativeName,
+    SubjectKeyIdentifier,
 };
+use openssl::x509::{X509NameBuilder, X509Ref, X509Req, X509ReqBuilder, X509};
+
+use promptly::prompt_default;
 use serialport::{self, SerialPort};
 use std::{
-    convert::TryInto,
     fs::{self, File},
     io::{self, BufRead, BufReader},
-    thread, time,
+    str, thread, time,
 };
 use thiserror::Error;
 
@@ -30,15 +34,6 @@ pub enum Error {
         #[from]
         source: io::Error,
     },
-
-    #[error("{source}")]
-    CertGen {
-        #[from]
-        source: rcgen::RcgenError,
-    },
-
-    #[error("pfx gen error")]
-    PfxGen,
 
     #[error("cert for {name} already exists!")]
     AlreadyExists { name: String },
@@ -78,31 +73,129 @@ pub enum Error {
     CustomError(String),
 }
 
-fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
-    // CA cert params
-    let mut params: CertificateParams = Default::default();
+fn mk_ca_cert(
+    config: &crate::CertConfig,
+) -> Result<(X509, PKey<Private>, Rsa<Private>), ErrorStack> {
+    let rsa = Rsa::generate(2048)?;
+    let key_pair = PKey::from_rsa(rsa.clone())?;
 
-    params.not_before = Utc::now();
-    params.not_after = params
-        .not_before
-        .with_year(params.not_before.year() + 4)
-        .unwrap();
+    let mut x509_name = X509NameBuilder::new()?;
+    x509_name.append_entry_by_text("C", &config.country)?;
+    x509_name.append_entry_by_text("ST", &config.state)?;
+    x509_name.append_entry_by_text("O", &config.organization)?;
+    x509_name.append_entry_by_text("CN", &config.domain)?;
+    let x509_name = x509_name.build();
 
-    params
-        .distinguished_name
-        .push(DnType::CountryName, config.country.clone());
-    params
-        .distinguished_name
-        .push(DnType::OrganizationName, config.organization.clone());
-    params
-        .distinguished_name
-        .push(DnType::CommonName, config.domain.clone());
+    let mut cert_builder = X509::builder()?;
+    cert_builder.set_version(2)?;
+    let serial_number = {
+        let mut serial = BigNum::new()?;
+        serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
+        serial.to_asn1_integer()?
+    };
+    cert_builder.set_serial_number(&serial_number)?;
+    cert_builder.set_subject_name(&x509_name)?;
+    cert_builder.set_issuer_name(&x509_name)?;
+    cert_builder.set_pubkey(&key_pair)?;
+    let not_before = Asn1Time::days_from_now(0)?;
+    cert_builder.set_not_before(&not_before)?;
+    let not_after = Asn1Time::days_from_now(365 * 5)?;
+    cert_builder.set_not_after(&not_after)?;
 
-    params.subject_alt_names = vec![SanType::DnsName(config.domain.clone())];
+    cert_builder.append_extension(BasicConstraints::new().critical().ca().build()?)?;
+    cert_builder.append_extension(
+        KeyUsage::new()
+            .critical()
+            .key_cert_sign()
+            .crl_sign()
+            .build()?,
+    )?;
 
-    params.use_authority_key_identifier_extension = true;
+    let subject_key_identifier =
+        SubjectKeyIdentifier::new().build(&cert_builder.x509v3_context(None, None))?;
+    cert_builder.append_extension(subject_key_identifier)?;
 
-    params
+    cert_builder.sign(&key_pair, MessageDigest::sha256())?;
+    let cert = cert_builder.build();
+
+    Ok((cert, key_pair, rsa))
+}
+
+/// Make a X509 request with the given private key
+fn mk_request(config: &crate::CertConfig, key_pair: &PKey<Private>) -> Result<X509Req, ErrorStack> {
+    let mut req_builder = X509ReqBuilder::new()?;
+    req_builder.set_pubkey(key_pair)?;
+
+    let mut x509_name = X509NameBuilder::new()?;
+    x509_name.append_entry_by_text("C", &config.country)?;
+    x509_name.append_entry_by_text("ST", &config.state)?;
+    x509_name.append_entry_by_text("O", &config.organization)?;
+    x509_name.append_entry_by_text("CN", &config.domain)?;
+    let x509_name = x509_name.build();
+    req_builder.set_subject_name(&x509_name)?;
+
+    req_builder.sign(key_pair, MessageDigest::sha256())?;
+    let req = req_builder.build();
+    Ok(req)
+}
+
+/// Make a certificate and private key signed by the given CA cert and private key
+fn mk_ca_signed_cert(
+    config: &crate::CertConfig,
+    ca_cert: &X509Ref,
+    ca_key_pair: &PKeyRef<Private>,
+) -> Result<(X509, PKey<Private>, Rsa<Private>), ErrorStack> {
+    let rsa = Rsa::generate(2048)?;
+    let key_pair = PKey::from_rsa(rsa.clone())?;
+
+    let req = mk_request(config, &key_pair)?;
+
+    let mut cert_builder = X509::builder()?;
+    cert_builder.set_version(2)?;
+    let serial_number = {
+        let mut serial = BigNum::new()?;
+        serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
+        serial.to_asn1_integer()?
+    };
+    cert_builder.set_serial_number(&serial_number)?;
+    cert_builder.set_subject_name(req.subject_name())?;
+    cert_builder.set_issuer_name(ca_cert.subject_name())?;
+    cert_builder.set_pubkey(&key_pair)?;
+    let not_before = Asn1Time::days_from_now(0)?;
+    cert_builder.set_not_before(&not_before)?;
+    let not_after = Asn1Time::days_from_now(365 * 5)?;
+    cert_builder.set_not_after(&not_after)?;
+
+    cert_builder.append_extension(BasicConstraints::new().build()?)?;
+
+    cert_builder.append_extension(
+        KeyUsage::new()
+            .critical()
+            .non_repudiation()
+            .digital_signature()
+            .key_encipherment()
+            .build()?,
+    )?;
+
+    let subject_key_identifier =
+        SubjectKeyIdentifier::new().build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
+    cert_builder.append_extension(subject_key_identifier)?;
+
+    let auth_key_identifier = AuthorityKeyIdentifier::new()
+        .keyid(false)
+        .issuer(false)
+        .build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
+    cert_builder.append_extension(auth_key_identifier)?;
+
+    let subject_alt_name = SubjectAlternativeName::new()
+        .dns(&config.domain)
+        .build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
+    cert_builder.append_extension(subject_alt_name)?;
+
+    cert_builder.sign(ca_key_pair, MessageDigest::sha256())?;
+    let cert = cert_builder.build();
+
+    Ok((cert, key_pair, rsa))
 }
 
 fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<(), Error> {
@@ -207,9 +300,19 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                 Some(id) => id,
                 None => {
                     // Open port
-                    let mut port = serialport::new(&cmd.port, 115_200)
+                    let mut port = match serialport::new(&cmd.port, 115_200)
                         .timeout(time::Duration::from_millis(10))
-                        .open()?;
+                        .open()
+                    {
+                        Ok(p) => p,
+                        Err(_) => {
+                            eprintln!(
+                                "Port {} is not connected! Check your connections and try again.",
+                                &cmd.port
+                            );
+                            return Ok(());
+                        }
+                    };
 
                     let mut reader = BufReader::new(port.try_clone()?);
 
@@ -280,7 +383,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                             tag: cmd.tag.unwrap_or(DEFAULT_PYRINAS_SECURITY_TAG),
                             ca_cert: Some(certs.ca_cert),
                             private_key: Some(certs.private_key),
-                            pub_key: Some(certs.client_cert),
+                            pub_key: Some(certs.public_key),
                         },
                     )?;
 
@@ -306,42 +409,29 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
         .to_string();
 
     // Get the path
-    let ca_der_path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
-    let ca_private_der_path = format!("{}/certs/{}/ca/ca.key.der", config_path, config.domain);
-    let ca_pem_path = format!("{}/certs/{}/ca/ca.pem", config_path, config.domain);
+    let ca_private_key_path = format!("{}/certs/{}/ca/ca.key", config_path, config.domain);
+    let ca_crt_path = format!("{}/certs/{}/ca/ca.crt", config_path, config.domain);
 
     // Check if CA exits
-    if std::path::Path::new(&ca_der_path).exists() {
+    if std::path::Path::new(&ca_crt_path).exists() {
         return Err(Error::AlreadyExists {
             name: "ca".to_string(),
         });
     }
-    // CA cert params
-    let mut params: CertificateParams = get_default_params(config);
-
-    // This can sign things!
-    params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
-
-    // Set the key usage
-    params.key_usages = vec![KeyUsagePurpose::CrlSign, KeyUsagePurpose::KeyCertSign];
-
-    // Set this to 10 years instead of default 4
-    params.not_after = params
-        .not_before
-        .with_year(params.not_before.year() + 10)
-        .unwrap();
+    // Create CA cert
+    let (crt, _, rsa_key_pair) = mk_ca_cert(config).unwrap();
 
     // Make sure folder exists
     std::fs::create_dir_all(format!("{}/certs/{}/ca", config_path, config.domain))?;
 
-    // Create ca
-    let ca_cert = Certificate::from_params(params).unwrap();
+    // Write ca
+    fs::write(
+        ca_private_key_path,
+        &rsa_key_pair.private_key_to_pem().unwrap(),
+    )?;
+    fs::write(ca_crt_path, &crt.to_pem().unwrap())?;
 
-    fs::write(ca_der_path, &ca_cert.serialize_der().unwrap())?;
-    fs::write(ca_private_der_path, &ca_cert.serialize_private_key_der())?;
-    fs::write(ca_pem_path, &ca_cert.serialize_pem().unwrap())?;
-
-    println!("Exported CA to {}", config_path);
+    println!("Exported CA to {}/certs/{}/ca", config_path, config.domain);
 
     Ok(())
 }
@@ -349,31 +439,23 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
 fn write_device_json(
     config: &CertConfig,
     name: &str,
-    cert: &Certificate,
-    ca_cert: &Certificate,
-    ca_der: &[u8],
+    cert: &Rsa<Private>,
+    ca_cert: &X509,
 ) -> Result<crate::device::DeviceCert, Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
 
-    // Serialize output
-    let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
-    let key_pem = cert.serialize_private_key_pem();
-
-    // Get CA cert to pem but don't keep re-signing it..
-    let p = Pem {
-        tag: "CERTIFICATE".to_string(),
-        contents: ca_der.to_vec(),
-    };
-
-    let ca_pem = pem::encode(&p);
+    // Get string pem for each
+    let private_key = String::from_utf8(cert.private_key_to_pem().unwrap()).unwrap();
+    let public_key = String::from_utf8(cert.public_key_to_pem().unwrap()).unwrap();
+    let ca_cert = String::from_utf8(ca_cert.to_pem().unwrap()).unwrap();
 
     // Export as JSON
     let json_device_cert = crate::device::DeviceCert {
-        private_key: key_pem,
-        client_cert: cert_pem,
-        ca_cert: ca_pem,
+        private_key,
+        public_key,
+        ca_cert,
         client_id: name.to_string(),
     };
 
@@ -397,16 +479,11 @@ fn write_device_json(
 pub fn write_keypair_pem(
     config: &CertConfig,
     name: &str,
-    cert: &Certificate,
-    ca_cert: &Certificate,
+    cert: &PKey<Private>,
 ) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
-
-    // Serialize output
-    let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
-    let key_pem = cert.serialize_private_key_pem();
 
     // Create directory if not already
     std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
@@ -417,92 +494,43 @@ pub fn write_keypair_pem(
             "{}/certs/{}/{}/{}.pem",
             config_path, config.domain, name, name
         ),
-        &cert_pem.as_bytes(),
+        &cert.public_key_to_pem().unwrap(),
     )?;
     fs::write(
         format!(
             "{}/certs/{}/{}/{}.key",
             config_path, config.domain, name, name
         ),
-        &key_pem.as_bytes(),
+        &cert.private_key_to_pem_pkcs8().unwrap(),
     )?;
 
     Ok(())
 }
 
-fn write_pfx(
-    config: &CertConfig,
-    name: &str,
-    cert: &Certificate,
-    ca_cert: &Certificate,
-    ca_der: &[u8],
-) -> Result<(), Error> {
-    // Config path
-    let config_path = crate::config::get_config_path()?
-        .to_string_lossy()
-        .to_string();
-
-    // Path to pfx
-    let ca_pfx_path = format!(
-        "{}/certs/{}/{}/{}.pfx",
-        config_path, config.domain, name, name
-    );
-
-    // Check if it exists
-    if std::path::Path::new(&ca_pfx_path).exists() {
-        return Err(Error::AlreadyExists {
-            name: name.to_string(),
-        });
-    }
-
-    // Create directory if not already
-    std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
-
-    let cert_der = cert.serialize_der_with_signer(ca_cert)?;
-    let key_der = cert.serialize_private_key_der();
-
-    // Serialize ca_der as bytes without re-signing..
-
-    // Generate pfx file!
-    let ca_pfx = PFX::new(&cert_der, &key_der, Some(ca_der), &config.pfx_pass, name)
-        .ok_or(Error::PfxGen)?
-        .to_der()
-        .to_vec();
-
-    // Write it
-    fs::write(ca_pfx_path, ca_pfx)?;
-
-    Ok(())
-}
-
-pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(Certificate, Vec<u8>), Error> {
+pub fn get_ca_cert(config: &crate::CertConfig) -> Result<(X509, PKey<Private>), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
         .to_string();
 
     // Load CA
-    let path = format!("{}/certs/{}/ca/ca.der", config_path, config.domain);
-    let ca_cert_der = match fs::read(path.clone()) {
-        Ok(d) => d,
+    let path = format!("{}/certs/{}/ca/ca.crt", config_path, config.domain);
+    let ca_cert_pem = match fs::read(path.clone()) {
+        Ok(d) => X509::from_pem(&d).unwrap(),
         Err(_) => panic!("{} not found. Generate CA first!", path),
     };
 
-    let path = format!("{}/certs/{}/ca/ca.key.der", config_path, config.domain);
-    let ca_cert_key_der = match fs::read(path.clone()) {
-        Ok(d) => d,
+    // Load CA key pair
+    let path = format!("{}/certs/{}/ca/ca.key", config_path, config.domain);
+    let ca_key_pair = match fs::read(path.clone()) {
+        Ok(d) => PKey::private_key_from_pem(&d).unwrap(),
         Err(_) => panic!("{} not found. Generate CA first!", path),
     };
-
-    // Import the CA
-    let ca_cert_params = CertificateParams::from_ca_cert_der(
-        ca_cert_der.as_slice(),
-        ca_cert_key_der.as_slice().try_into()?,
-    )?;
 
     // Return the cert or error
-    Ok((Certificate::from_params(ca_cert_params)?, ca_cert_der))
+    Ok((ca_cert_pem, ca_key_pair))
 }
 
+// TODO:
 pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let config_path = crate::config::get_config_path()?
         .to_string_lossy()
@@ -510,7 +538,7 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
     let name = "server".to_string();
 
     let server_cert_path = format!(
-        "{}/certs/{}/{}/{}.pfx",
+        "{}/certs/{}/{}/{}.pem",
         config_path, config.domain, name, name
     );
 
@@ -519,34 +547,35 @@ pub fn generate_server_cert(config: &crate::CertConfig) -> Result<(), Error> {
         return Err(Error::AlreadyExists { name });
     }
 
-    // Get CA Cert
-    let (ca_cert, ca_der) = get_ca_cert(config)?;
+    // Get CA cert from file
+    let (ca_cert, ca_key_pair) = get_ca_cert(config).unwrap();
 
-    // Cert params
-    let mut params: CertificateParams = get_default_params(config);
+    // Generate keypair
+    let (_crt, _, rsa_key_pair) = mk_ca_signed_cert(config, &ca_cert, &ca_key_pair).unwrap();
 
-    // Set the key usage
-    params.key_usages = vec![
-        KeyUsagePurpose::DigitalSignature,
-        KeyUsagePurpose::KeyEncipherment,
-    ];
+    // Make sure folder exists
+    std::fs::create_dir_all(format!("{}/certs/{}/{}", config_path, config.domain, name))?;
 
-    // Set the ext key useage
-    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
+    // Write to files
+    fs::write(
+        format!(
+            "{}/certs/{}/{}/{}.pem",
+            config_path, config.domain, name, name
+        ),
+        &rsa_key_pair.public_key_to_pem().unwrap(),
+    )?;
+    fs::write(
+        format!(
+            "{}/certs/{}/{}/{}.key",
+            config_path, config.domain, name, name
+        ),
+        &rsa_key_pair.private_key_to_pem().unwrap(),
+    )?;
 
-    // Set the alt name
-    params.subject_alt_names = vec![SanType::DnsName(config.domain.clone())];
-
-    // Make the cert
-    let cert = Certificate::from_params(params)?;
-
-    // Write cert to file(s)
-    write_keypair_pem(config, &name, &cert, &ca_cert)?;
-
-    // Write pfx
-    write_pfx(config, &name, &cert, &ca_cert, &ca_der)?;
-
-    println!("Exported server .pfx to {}", config_path);
+    println!(
+        "Exported server cert to {}/certs/{}/{}",
+        config_path, config.domain, name
+    );
 
     Ok(())
 }
@@ -557,7 +586,7 @@ pub fn get_device_cert_path(config: &crate::CertConfig, name: &str) -> Result<St
         .to_string();
 
     Ok(format!(
-        "{}/certs/{}/{}/{}.pem",
+        "{}/certs/{}/{}/{}.json",
         config_path, config.domain, name, name
     ))
 }
@@ -575,33 +604,14 @@ pub fn generate_device_cert(
         });
     }
 
-    // Get CA Cert
-    let (ca_cert, ca_der) = get_ca_cert(config)?;
+    // Get CA cert from file
+    let (ca_cert, ca_key_pair) = get_ca_cert(config).unwrap();
 
-    // Cert params
-    let mut params: CertificateParams = get_default_params(config);
-
-    // Set the key usage
-    params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
-
-    // Set the ext key useage
-    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ClientAuth];
-
-    // Set the alt name
-    params.subject_alt_names = vec![SanType::Rfc822Name(format!(
-        "{}@{}",
-        name,
-        config.domain.clone()
-    ))];
-
-    // Make the cert
-    let cert = Certificate::from_params(params)?;
-
-    // Write all cert info to file(s)
-    // write_keypair_pem(&config, &name, &cert, &ca_cert)?;
+    // Generate keypair
+    let (_, _, rsa_key_pair) = mk_ca_signed_cert(config, &ca_cert, &ca_key_pair).unwrap();
 
     // Write nRF Connect Desktop compatable JSON for cert install
-    let certs = write_device_json(config, name, &cert, &ca_cert, &ca_der)?;
+    let certs = write_device_json(config, name, &rsa_key_pair, &ca_cert)?;
 
     println!("Exported cert for {} to {}", name, device_cert_path);
 

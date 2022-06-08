@@ -156,8 +156,8 @@ pub struct CertConfig {
     pub organization: String,
     /// Country entry for cert gen
     pub country: String,
-    /// PFX password
-    pub pfx_pass: String,
+    /// State entry for cert gen
+    pub state: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-cli"
-version = "0.4.4"
+version = "0.4.5"
 license = "Apache-2.0"
 description = "Companion CLI for Pyrinas Server. Used to remotely add OTA images."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -15,11 +15,6 @@ path = "src/bin/example/cli.rs"
 
 [dependencies]
 pyrinas-shared = { version = "0.3.2", path = "../lib-shared/" }
-pem = "1.0"
-rcgen = { version = "0.8", features = [
-    "x509-parser",
-    "pem",
-] } # Used to generate certs
 chrono = "0.4" # Tracking time
 clap = "3.0" # CLI Library (Needed?)
 env_logger = "0.9" # logging message control using env variable
@@ -30,11 +25,11 @@ serde_cbor = "^0.11.0" # Serde specific CBOR serialize/deserialze
 thiserror = "1.0" # Error handling
 home = "0.5.3" # Get home directory 
 toml = "0.5.8" # Serializing/deserializing configuration
-tungstenite = { version = "0.16.0", features = [
+tungstenite = { version = "0.17", features = [
     "rustls-tls-native-roots",
 ] } # Websocket client
-git2 = "0.13.17" # Git describe for getting version
+git2 = "0.14" # Git describe for getting version
 semver = "1.0" # Parsing version string
-p12 = "0.4" # Used for creating .pfx file
 serialport = "4" # Connecting to serial port
 promptly = "0.3.0" # Prompt
+openssl = "0.10.40" # For cert generation

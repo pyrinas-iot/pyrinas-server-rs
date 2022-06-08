@@ -19,6 +19,7 @@ enum SubCommand {
     Cert(CertCmd),
 }
 
+// TODO: error handler to print out human friendly messages..
 fn main() -> Result<(), Error> {
     // Opts from CLI
     let opts: Opts = Opts::parse();
@@ -29,10 +30,18 @@ fn main() -> Result<(), Error> {
     // Get config
     let config = match pyrinas_cli::config::get_config() {
         Ok(c) => c,
-        Err(_e) => {
-            return Err(Error::CustomError(
-                "Unable to get config. Run \"init\" command before you continue.".to_string(),
-            ))
+        Err(e) => {
+            match e {
+                pyrinas_cli::config::Error::HomeError => eprintln!("Unable to get home path!"),
+                pyrinas_cli::config::Error::FileError { source: _ } => {
+                    eprintln!("Unable to get config. Run \"init\" command before you continue.")
+                }
+                pyrinas_cli::config::Error::TomlError { source } => {
+                    eprintln!("Error reading config file. Err: {}", source)
+                }
+            };
+
+            return Ok(());
         }
     };
 

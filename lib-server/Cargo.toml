@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2018"
 name = "pyrinas-server"
-version = "0.4.3"
+version = "0.4.4"
 license = "Apache-2.0"
 description = "IoT Server with built-in OTA support and data logging capabilities."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -18,7 +18,7 @@ use-rustls = ["rumqttd/use-rustls"]
 pyrinas-shared = { version = "0.3.2", path = "../lib-shared/" } # Local shared for settings, etc 
 clap = "3.0"                                                    # CLI Library
 env_logger = "0.9"                                              # logging message control using env variable
-influxdb = { version = "0.4", features = ["derive"] }           # InfluxDB access 
+influxdb = { version = "0.5", features = ["derive"] }           # InfluxDB access 
 log = "0.4"                                                     # logging messages
 rumqttd = { version = "0.11", default-features = false }        # Mqtt core bits
 serde = { version = "1.0", features = ["derive"] }              # Serializing/deserializing 
