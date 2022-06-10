@@ -1,6 +1,6 @@
 [package]
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
-edition = "2018"
+edition = "2021"
 name = "pyrinas-cli"
 version = "0.4.4"
 license = "Apache-2.0"

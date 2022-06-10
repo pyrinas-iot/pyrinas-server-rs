@@ -2,7 +2,7 @@
 name = "pyrinas-codec-example"
 version = "0.1.0"
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["staticlib", "lib"] # C
