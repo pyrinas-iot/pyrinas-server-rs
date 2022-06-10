@@ -11,7 +11,7 @@ path = "src/bin/client.rs"
 [dependencies]
 pyrinas-codec-example = { version = "0.1", path = "../../lib-codec-example/" }
 
-rumqttc = { version = "0.10.0" } # Mqtt client bits
+rumqttc = { git = "https://github.com/jaredwolff/rumqtt.git", branch = "rsa-detect" } # Mqtt client bits
 
 clap = "3.0"                # CLI Library
 tokio = { version = "1.0" } # async runtime

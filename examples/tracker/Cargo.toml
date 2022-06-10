@@ -9,7 +9,9 @@ name = "tracker"
 path = "src/bin/server/server.rs"
 
 [dependencies]
-pyrinas-server = { path = "../../lib-server" }
+pyrinas-server = { path = "../../lib-server", default-features = false, features = [
+    "use-rustls",
+] }
 
 flume = "0.10.2"            # Channels
 clap = "3.0"                # CLI Library
