@@ -1,4 +1,3 @@
-use chrono::{Datelike, Utc};
 use p12::PFX;
 use pem::Pem;
 use promptly::prompt_default;
@@ -11,9 +10,10 @@ use std::{
     convert::TryInto,
     fs::{self, File},
     io::{self, BufRead, BufReader},
-    thread, time,
+    thread,
 };
 use thiserror::Error;
+use time::{ext::NumericalDuration, OffsetDateTime};
 
 use crate::{config, ota, CertCmd, CertConfig, CertEntry, CertSubcommand};
 
@@ -82,11 +82,8 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     // CA cert params
     let mut params: CertificateParams = Default::default();
 
-    params.not_before = Utc::now();
-    params.not_after = params
-        .not_before
-        .with_year(params.not_before.year() + 4)
-        .unwrap();
+    params.not_before = OffsetDateTime::now_utc();
+    params.not_after = params.not_before.checked_add((365 * 4).days()).unwrap();
 
     params
         .distinguished_name
@@ -134,7 +131,7 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
         }
 
         // Delay
-        thread::sleep(time::Duration::from_secs(2));
+        thread::sleep(std::time::Duration::from_secs(2));
     }
 
     // Write the public key
@@ -162,7 +159,7 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
         }
 
         // Delay
-        thread::sleep(time::Duration::from_secs(2));
+        thread::sleep(std::time::Duration::from_secs(2));
     }
 
     // AT%CMNG=0,16842753,2,""
@@ -208,7 +205,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                 None => {
                     // Open port
                     let mut port = serialport::new(&cmd.port, 115_200)
-                        .timeout(time::Duration::from_millis(10))
+                        .timeout(std::time::Duration::from_millis(10))
                         .open()?;
 
                     let mut reader = BufReader::new(port.try_clone()?);
@@ -217,7 +214,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     port.write_fmt(format_args!("AT+CGSN=1?\r\n"))?;
 
                     // Get the current timestamp
-                    let now = time::Instant::now();
+                    let now = std::time::Instant::now();
 
                     loop {
                         if now.elapsed().as_secs() > 5 {
@@ -268,7 +265,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
             if cmd.provision {
                 // Open port
                 let mut port = serialport::new(&cmd.port, 115_200)
-                    .timeout(time::Duration::from_millis(10))
+                    .timeout(std::time::Duration::from_millis(10))
                     .open()?;
 
                 // confirm provision
@@ -326,10 +323,7 @@ pub fn generate_ca_cert(config: &crate::CertConfig) -> Result<(), Error> {
     params.key_usages = vec![KeyUsagePurpose::CrlSign, KeyUsagePurpose::KeyCertSign];
 
     // Set this to 10 years instead of default 4
-    params.not_after = params
-        .not_before
-        .with_year(params.not_before.year() + 10)
-        .unwrap();
+    params.not_after = params.not_before.checked_add((10 * 365).days()).unwrap();
 
     // Make sure folder exists
     std::fs::create_dir_all(format!("{}/certs/{}/ca", config_path, config.domain))?;

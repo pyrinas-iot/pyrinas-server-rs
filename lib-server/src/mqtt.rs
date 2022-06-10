@@ -67,10 +67,8 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
             match event_type {
                 "ota" => {
                     // Get the telemetry data
-                    let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error>;
-
-                    // Get the result
-                    res = serde_cbor::from_slice(&payload);
+                    let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error> =
+                        serde_cbor::from_slice(&payload);
 
                     // Match function to handle error
                     match res {
@@ -91,10 +89,8 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                 }
                 "tel" => {
                     // Get the telemetry data
-                    let res: Result<telemetry::TelemetryData, serde_cbor::error::Error>;
-
-                    // Get the result
-                    res = serde_cbor::from_slice(&payload);
+                    let res: Result<telemetry::TelemetryData, serde_cbor::error::Error> =
+                        serde_cbor::from_slice(&payload);
 
                     // Match function to handle error
                     match res {

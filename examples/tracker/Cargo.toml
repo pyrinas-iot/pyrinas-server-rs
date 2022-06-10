@@ -17,7 +17,7 @@ env_logger = "0.9"          # logging message control using env variable
 tokio = { version = "1.0" } # async runtime
 log = "0.4"                 # logging messages
 
-influxdb = { version = "0.4", features = ["derive"] } # InfluxDB access 
+influxdb = { version = "0.5", features = ["derive"] } # InfluxDB access 
 chrono = { version = "0.4", features = ["serde"] }    # Tracking time
 
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
