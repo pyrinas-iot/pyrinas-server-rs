@@ -20,11 +20,17 @@ use crate::{config, ota, CertCmd, CertConfig, CertEntry, CertSubcommand};
 /// Default serial port for MAC
 pub const DEFAULT_MAC_PORT: &str = "/dev/tty.SLAB_USBtoUART";
 
+/// At prefix
+pub const AT_PREFIX: &str = "at ";
+
 /// Default security tag for Pyrinas
 pub const DEFAULT_PYRINAS_SECURITY_TAG: u32 = 1234;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Timeout error waiting for response from device.")]
+    TimeoutError,
+
     #[error("{source}")]
     FileError {
         #[from]
@@ -106,18 +112,63 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
     // Get the reader
     let mut reader = BufReader::new(port.try_clone()?);
 
+    // Disable modem
+    if let Err(e) = port.write_fmt(format_args!("{}AT+CFUN=4\r\n", AT_PREFIX)) {
+        return Err(Error::CustomError(format!(
+            "Unable to disable modem. Error: {}",
+            e
+        )));
+    }
+
+    // Flush output
+    port.flush()?;
+
+    // Get the current timestamp
+    let now = std::time::Instant::now();
+
+    // Wait for "OK" response
+    loop {
+        if now.elapsed().as_secs() > 5 {
+            return Err(Error::TimeoutError);
+        }
+
+        let mut line = String::new();
+        if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+            break;
+        }
+    }
+
     // Set the ca certificate..
     // AT%CMNG=0,16842753,0,""
     if let Some(ca_cert) = &cert.ca_cert {
-        if let Err(e) = port.write_fmt(format_args!(
-            "AT%CMNG=0,{},0,\"{}\"\r\n",
-            &cert.tag, &ca_cert
-        )) {
+        // Get command payload
+        let payload = format!("AT%CMNG=0,{},0,\"{}\"", &cert.tag, &ca_cert);
+
+        // Activate raw mode
+        if let Err(e) = port.write_fmt(format_args!("{}raw {}\r\n", AT_PREFIX, payload.len())) {
             return Err(Error::CustomError(format!(
                 "Unable to write CA cert. Error: {}",
                 e
             )));
         }
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+
+        // Write payload
+        if let Err(e) = port.write_fmt(format_args!("{}", payload)) {
+            return Err(Error::CustomError(format!(
+                "Unable to write CA cert. Error: {}",
+                e
+            )));
+        }
+
+        println!("Write ca cert");
 
         // Flush output
         let _ = port.flush();
@@ -128,7 +179,13 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
             if reader.read_line(&mut line).is_ok() && line.contains("OK") {
                 break;
             }
+
+            if line.contains("ERROR") {
+                return Err(Error::CustomError(format!("Unable to write CA cert.")));
+            }
         }
+
+        println!("Write ca cert complete");
 
         // Delay
         thread::sleep(std::time::Duration::from_secs(2));
@@ -136,16 +193,33 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
 
     // Write the public key
     if let Some(pub_key) = &cert.pub_key {
+        let payload = format!("{}AT%CMNG=0,{},1,\"{}\"", AT_PREFIX, &cert.tag, pub_key);
+
         // AT%CMNG=0,16842753,1,""
-        if let Err(e) = port.write_fmt(format_args!(
-            "AT%CMNG=0,{},1,\"{}\"\r\n",
-            &cert.tag, pub_key
-        )) {
+        if let Err(e) = port.write_fmt(format_args!("{}raw {}\r\n", AT_PREFIX, payload.len())) {
             return Err(Error::CustomError(format!(
-                "Unable to write client cert. Error: {}",
+                "Unable to write public key. Error: {}",
                 e
             )));
         }
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+
+        // Write payload
+        if let Err(e) = port.write_fmt(format_args!("{}", payload)) {
+            return Err(Error::CustomError(format!(
+                "Unable to write public key. Error: {}",
+                e
+            )));
+        }
+
+        println!("Write pub key");
 
         // Flush output
         let _ = port.flush();
@@ -156,7 +230,13 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
             if reader.read_line(&mut line).is_ok() && line.contains("OK") {
                 break;
             }
+
+            if line.contains("ERROR") {
+                return Err(Error::CustomError(format!("Unable to write private key.")));
+            }
         }
+
+        println!("Write pub key complete");
 
         // Delay
         thread::sleep(std::time::Duration::from_secs(2));
@@ -164,16 +244,32 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
 
     // AT%CMNG=0,16842753,2,""
     if let Some(private_key) = &cert.private_key {
-        if let Err(e) = port.write_fmt(format_args!(
-            "AT%CMNG=0,{},2,\"{}\"\r\n",
-            cert.tag, private_key
-        )) {
-            //
+        let payload = format!("{}AT%CMNG=0,{},2,\"{}\"", AT_PREFIX, cert.tag, private_key);
+
+        if let Err(e) = port.write_fmt(format_args!("{}raw {}\r\n", AT_PREFIX, payload.len())) {
             return Err(Error::CustomError(format!(
-                " Unable to write private key. Error: {}",
+                "Unable to write private key. Error: {}",
                 e
             )));
         }
+
+        // Wait for "OK" response
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_ok() && line.contains("OK") {
+                break;
+            }
+        }
+
+        // Write payload
+        if let Err(e) = port.write_fmt(format_args!("{}", payload)) {
+            return Err(Error::CustomError(format!(
+                "Unable to write private key. Error: {}",
+                e
+            )));
+        }
+
+        println!("Write private key");
 
         // Flush output
         let _ = port.flush();
@@ -184,7 +280,13 @@ fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<
             if reader.read_line(&mut line).is_ok() && line.contains("OK") {
                 break;
             }
+
+            if line.contains("ERROR") {
+                return Err(Error::CustomError(format!("Unable to write public key.")));
+            }
         }
+
+        println!("Write private key complete");
     }
 
     Ok(())
@@ -211,7 +313,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     let mut reader = BufReader::new(port.try_clone()?);
 
                     // issue AT command to get IMEI
-                    port.write_fmt(format_args!("AT+CGSN=1?\r\n"))?;
+                    port.write_fmt(format_args!("{}AT+CGSN=1?\r\n", AT_PREFIX))?;
 
                     // Get the current timestamp
                     let now = std::time::Instant::now();
@@ -247,10 +349,10 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
             let certs = match generate_device_cert(&config.cert, &id) {
                 Ok(c) => c,
                 Err(_e) => {
-                    println!("Cert for {} already generated!", &id);
-
                     // Get path
                     let path = get_device_cert_path(&config.cert, &id)?;
+
+                    println!("Cert loaded from {}.", path);
 
                     // Read from file
                     let file = File::open(path)?;
@@ -286,6 +388,14 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                         for entry in alts {
                             write_credential(&mut port, entry)?;
                         }
+                    }
+
+                    // Reboot
+                    if let Err(e) = port.write_fmt(format_args!("kernel reboot cold\r\n")) {
+                        return Err(Error::CustomError(format!(
+                            "Unable to reboot device. Error: {}",
+                            e
+                        )));
                     }
 
                     println!("Provisioning complete!");
@@ -551,7 +661,7 @@ pub fn get_device_cert_path(config: &crate::CertConfig, name: &str) -> Result<St
         .to_string();
 
     Ok(format!(
-        "{}/certs/{}/{}/{}.pem",
+        "{}/certs/{}/{}/{}.json",
         config_path, config.domain, name, name
     ))
 }
