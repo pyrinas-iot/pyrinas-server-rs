@@ -80,6 +80,12 @@ pub enum Error {
         source: promptly::ReadlineError,
     },
 
+    #[error("{source}")]
+    PemError {
+        #[from]
+        source: pem::PemError,
+    },
+
     #[error("err: {0}")]
     CustomError(String),
 }
@@ -108,7 +114,101 @@ fn get_default_params(config: &crate::CertConfig) -> CertificateParams {
     params
 }
 
-fn write_credential(port: &mut Box<dyn SerialPort>, cert: &CertEntry) -> Result<(), Error> {
+fn write_der_credential(
+    port: &mut Box<dyn SerialPort>,
+    tag: u32,
+    kind: u32,
+    cert: &Vec<u8>,
+) -> Result<(), Error> {
+    // Get the reader
+    let mut reader = BufReader::new(port.try_clone()?);
+
+    // Convert to string
+    let cert = hex::encode(cert);
+
+    log::info!("{}", cert);
+
+    // Setup to write the ca cert
+    if let Err(e) = port.write_fmt(format_args!(
+        "credentials set {} {} {}\r\n",
+        &tag,
+        &kind,
+        &cert.len()
+    )) {
+        return Err(Error::CustomError(format!(
+            "Unable to send setup command. Error: {}",
+            e
+        )));
+    }
+
+    log::info!("credentials set {} {} {}", &tag, &kind, &cert.len());
+
+    // Write the raw bytes
+    if let Err(e) = port.write_fmt(format_args!("{}\r\n", cert)) {
+        return Err(Error::CustomError(format!(
+            "Unable to send bytes. Error: {}",
+            e
+        )));
+    }
+
+    // Flush output
+    let _ = port.flush();
+
+    // Get the current timestamp
+    let now = std::time::Instant::now();
+
+    // Wait for "OK" response
+    loop {
+        if now.elapsed().as_secs() > 5 {
+            return Err(Error::TimeoutError);
+        }
+
+        let mut line = String::new();
+        if reader.read_line(&mut line).is_ok()
+            && line.contains(&format!("Setting pyrinas/cred/{}/{} saved", tag, kind))
+        {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_der_credentials(
+    port: &mut Box<dyn SerialPort>,
+    cert: &CertEntry<Vec<u8>>,
+) -> Result<(), Error> {
+    // First the CA cert
+    if let Some(c) = &cert.ca_cert {
+        write_der_credential(port, cert.tag, 1, &c)?;
+
+        // Delay
+        thread::sleep(std::time::Duration::from_secs(1));
+    }
+
+    // Then the device cert
+    if let Some(c) = &cert.pub_key {
+        write_der_credential(port, cert.tag, 2, &c)?;
+
+        // Delay
+        thread::sleep(std::time::Duration::from_secs(1));
+    }
+
+    // Then the private key
+    if let Some(c) = &cert.private_key {
+        write_der_credential(port, cert.tag, 3, &c)?;
+
+        // Delay
+        thread::sleep(std::time::Duration::from_secs(1));
+    }
+
+    Ok(())
+}
+
+fn write_credentials(
+    port: &mut Box<dyn SerialPort>,
+    cert: &CertEntry<String>,
+) -> Result<(), Error> {
     // Get the reader
     let mut reader = BufReader::new(port.try_clone()?);
 
@@ -313,7 +413,7 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                     let mut reader = BufReader::new(port.try_clone()?);
 
                     // issue AT command to get IMEI
-                    port.write_fmt(format_args!("{}AT+CGSN=1?\r\n", AT_PREFIX))?;
+                    port.write_fmt(format_args!("hwinfo devid\r\n"))?;
 
                     // Get the current timestamp
                     let now = std::time::Instant::now();
@@ -328,17 +428,12 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                         let mut line = String::new();
                         if reader.read_line(&mut line).is_ok() {
                             // See if the line contains the start dialog
-                            if line.contains("+CGSN: ") {
+                            if line.contains("ID: ") {
                                 break line
-                                    .strip_prefix("+CGSN: ")
+                                    .strip_prefix("ID: 0x")
                                     .expect("Should have had a value!")
                                     .trim_end()
-                                    .trim_matches('\"')
                                     .to_string();
-                            } else if line.contains("at_host: Error") {
-                                return Err(Error::CustomError(String::from(
-                                    "AT error communicating with device.",
-                                )));
                             }
                         }
                     }
@@ -372,21 +467,87 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
 
                 // confirm provision
                 if prompt_default("Ready to provision to device. Continue?", false)? {
-                    // Device default cert
-                    write_credential(
-                        &mut port,
-                        &CertEntry {
+                    if cmd.der {
+                        let config_path = crate::config::get_config_path()?
+                            .to_string_lossy()
+                            .to_string();
+
+                        // Get the paths
+                        let ca_path =
+                            format!("{}/certs/{}/ca/ca.der", config_path, config.cert.domain);
+
+                        let public_key_path = format!(
+                            "{}/certs/{}/{}/{}.crt.der",
+                            config_path, config.cert.domain, &id, &id
+                        );
+
+                        let private_key_path = format!(
+                            "{}/certs/{}/{}/{}.key.der",
+                            config_path, config.cert.domain, &id, &id
+                        );
+
+                        let e = CertEntry {
                             tag: cmd.tag.unwrap_or(DEFAULT_PYRINAS_SECURITY_TAG),
-                            ca_cert: Some(certs.ca_cert),
-                            private_key: Some(certs.private_key),
-                            pub_key: Some(certs.client_cert),
-                        },
-                    )?;
+                            ca_cert: Some(fs::read(ca_path)?),
+                            private_key: Some(fs::read(private_key_path)?),
+                            pub_key: Some(fs::read(public_key_path)?),
+                        };
+
+                        // Convert to DER format
+                        // let ca_cert = pem::parse(certs.ca_cert)?;
+                        // e.ca_cert = Some(ca_cert.contents);
+
+                        // let private_key = pem::parse(certs.private_key)?;
+                        // e.private_key = Some(private_key.contents);
+
+                        // let client_cert = pem::parse(certs.client_cert)?;
+                        // e.pub_key = Some(client_cert.contents);
+
+                        write_der_credentials(&mut port, &e)?;
+                    } else {
+                        // Device default cert
+                        write_credentials(
+                            &mut port,
+                            &CertEntry {
+                                tag: cmd.tag.unwrap_or(DEFAULT_PYRINAS_SECURITY_TAG),
+                                ca_cert: Some(certs.ca_cert),
+                                private_key: Some(certs.private_key),
+                                pub_key: Some(certs.client_cert),
+                            },
+                        )?;
+                    }
 
                     // Other certs as necessary
                     if let Some(alts) = &config.alts {
                         for entry in alts {
-                            write_credential(&mut port, entry)?;
+                            if cmd.der {
+                                let mut e = CertEntry {
+                                    tag: entry.tag,
+                                    ca_cert: None,
+                                    private_key: None,
+                                    pub_key: None,
+                                };
+
+                                // Convert to DER format
+                                if let Some(ca) = &entry.ca_cert {
+                                    let ca_cert = pem::parse(ca)?;
+                                    e.ca_cert = Some(ca_cert.contents);
+                                }
+
+                                if let Some(pk) = &entry.private_key {
+                                    let private_key = pem::parse(pk)?;
+                                    e.private_key = Some(private_key.contents);
+                                }
+
+                                if let Some(pub_key) = &entry.pub_key {
+                                    let client_cert = pem::parse(pub_key)?;
+                                    e.pub_key = Some(client_cert.contents);
+                                }
+
+                                write_der_credentials(&mut port, &e)?;
+                            } else {
+                                write_credentials(&mut port, entry)?;
+                            }
                         }
                     }
 
@@ -397,6 +558,9 @@ pub fn process(config: &crate::Config, c: &CertCmd) -> Result<(), Error> {
                             e
                         )));
                     }
+
+                    // Flush output
+                    let _ = port.flush();
 
                     println!("Provisioning complete!");
                 }
@@ -461,9 +625,32 @@ fn write_device_json(
         .to_string_lossy()
         .to_string();
 
+    // Make sure there's a directory
+    std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
+
     // Serialize output
     let cert_pem = cert.serialize_pem_with_signer(ca_cert).unwrap();
     let key_pem = cert.serialize_private_key_pem();
+
+    // Der
+    let cert_der = pem::parse(&cert_pem).unwrap().contents;
+    let key_der = pem::parse(&key_pem).unwrap().contents;
+
+    fs::write(
+        format!(
+            "{}/certs/{}/{}/{}.crt.der",
+            config_path, config.domain, name, name
+        ),
+        &cert_der,
+    )?;
+
+    fs::write(
+        format!(
+            "{}/certs/{}/{}/{}.key.der",
+            config_path, config.domain, name, name
+        ),
+        &key_der,
+    )?;
 
     // Get CA cert to pem but don't keep re-signing it..
     let p = Pem {
@@ -482,9 +669,6 @@ fn write_device_json(
     };
 
     let json_output = serde_json::to_string(&json_device_cert)?;
-
-    // Make sure there's a directory
-    std::fs::create_dir_all(format!("{}/certs/{}/{}/", config_path, config.domain, name))?;
 
     // Write JSON
     fs::write(

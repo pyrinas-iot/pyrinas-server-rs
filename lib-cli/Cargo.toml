@@ -39,3 +39,4 @@ p12 = "0.6" # Used for creating .pfx file
 serialport = "4" # Connecting to serial port
 promptly = "0.3.0" # Prompt
 time = "0.3.9"
+hex = "0.4.3"

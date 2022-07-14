@@ -99,6 +99,9 @@ pub struct CertDevice {
     /// Automatic provision
     #[clap(long, short)]
     provision: bool,
+    /// Provision to device using DER
+    #[clap(long, short)]
+    der: bool,
     /// Serial port
     #[clap(long, default_value = certs::DEFAULT_MAC_PORT )]
     port: String,
@@ -161,15 +164,15 @@ pub struct CertConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct CertEntry {
+pub struct CertEntry<T> {
     /// tag number
     pub tag: u32,
     /// ca cert
-    pub ca_cert: Option<String>,
+    pub ca_cert: Option<T>,
     /// private key
-    pub private_key: Option<String>,
+    pub private_key: Option<T>,
     /// pub key
-    pub pub_key: Option<String>,
+    pub pub_key: Option<T>,
 }
 
 /// Config that can be installed locally
@@ -186,7 +189,7 @@ pub struct Config {
     /// Server cert configuration
     pub cert: CertConfig,
     /// Alternative Certs to program to provisioned devices
-    pub alts: Option<Vec<CertEntry>>,
+    pub alts: Option<Vec<CertEntry<String>>>,
 }
 
 /// Configuration related commands
