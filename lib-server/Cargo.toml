@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2021"
 name = "pyrinas-server"
-version = "0.4.3"
+version = "0.5.0"
 license = "Apache-2.0"
 description = "IoT Server with built-in OTA support and data logging capabilities."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -39,7 +39,4 @@ tokio = { version = "1.0", default-features = false, features = [
     "macros",
     "io-util",
 ] } # async runtime
-tokio-stream = { version = "0.1", features = [
-    "net",
-] } # tokio stream (removed from mainline tokio until future)
-warp = { version = "0.3" } # Webserver for hosting OTA files
+tokio-tungstenite = "0.17.2"

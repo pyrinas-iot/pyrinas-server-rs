@@ -13,7 +13,7 @@ use std::{net::TcpStream, num};
 use thiserror::Error;
 
 // Websocket
-use tungstenite::{http, http::Request, protocol::WebSocket, stream::MaybeTlsStream};
+use tungstenite::{client::IntoClientRequest, http, protocol::WebSocket, stream::MaybeTlsStream};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -255,15 +255,16 @@ pub fn get_socket(config: &Config) -> Result<WebSocket<MaybeTlsStream<TcpStream>
         config.url
     );
 
-    // Set up handshake request
-    let req = Request::builder()
-        .uri(full_uri)
-        .header("ApiKey", config.authkey.clone())
-        .body(())?;
+    log::info!("{}", full_uri);
+
+    /* Add ApiKey */
+    let mut request = full_uri.into_client_request()?;
+    request
+        .headers_mut()
+        .append("ApiKey", config.authkey.clone().parse().unwrap());
 
     // Connect to TCP based WS socket
-    // TODO: confirm URL is parsed correctly into tungstenite
-    let (socket, _response) = tungstenite::connect(req)?;
+    let (socket, _response) = tungstenite::connect(request)?;
 
     // Return this guy
     Ok(socket)

@@ -3,11 +3,12 @@ use std::sync::Arc;
 // async Related
 use flume::{unbounded, Sender};
 use futures::{FutureExt, StreamExt};
-use tokio::sync::Mutex;
-use warp::ws::Message;
-
-// Unix listener
-use warp::{ws::WebSocket, Filter};
+use tokio::net::TcpStream;
+use tokio::{net::TcpListener, sync::Mutex};
+use tokio_tungstenite::tungstenite::{
+    self,
+    handshake::server::{ErrorResponse, Request, Response},
+};
 
 // Local lib related
 use crate::settings;
@@ -20,18 +21,55 @@ use serde_cbor;
 // Error
 use crate::Error;
 
-pub type AdminClient = Arc<Mutex<Option<Sender<Result<Message, warp::Error>>>>>;
+pub type AdminClient = Arc<Mutex<Option<Sender<Result<tungstenite::Message, tungstenite::Error>>>>>;
 
 // Handle the incoming connection
 async fn handle_connection(
+    stream: TcpStream,
     broker_sender: Sender<Event>,
-    websocket: WebSocket,
+    settings: settings::Admin,
     client: AdminClient,
 ) {
     log::debug!("Got stream!");
 
+    let callback = |req: &Request, response: Response| -> Result<Response, ErrorResponse> {
+        log::debug!("Received a new ws handshake");
+        log::debug!("The request's path is: {}", req.uri().path());
+
+        // Return error if key is not there
+        if !req.headers().contains_key("ApiKey") {
+            log::warn!("Does not contain key!");
+            return Err(ErrorResponse::new(None));
+        };
+
+        // Make sure it's the right value
+        match req.headers().get("ApiKey") {
+            Some(v) => {
+                if !v.eq(&settings.api_key) {
+                    log::warn!("Key not equal!");
+                    return Err(ErrorResponse::new(None));
+                }
+            }
+            None => {
+                log::warn!("Key not found!");
+                return Err(ErrorResponse::new(None));
+            }
+        };
+
+        Ok(response)
+    };
+
+    // Attempt to start connection
+    let websocket = match tokio_tungstenite::accept_hdr_async(stream, callback).await {
+        Ok(ws) => ws,
+        Err(e) => {
+            log::error!("Error making ws conn: {}", e);
+            return;
+        }
+    };
+
     // Ensure only one admin connection
-    if client.lock().await.is_some() {
+    if let Err(_e) = client.try_lock() {
         log::warn!("Already connected to admin client!");
         return;
     }
@@ -54,11 +92,12 @@ async fn handle_connection(
     }
 
     while let Some(Ok(msg)) = ws_rx.next().await {
-        log::debug!("msg size: {}", msg.as_bytes().len());
+        let data = msg.into_data();
+        log::debug!("msg size: {}", data.len());
 
         // First deocde into ManagementRequest struct
         let req: pyrinas_shared::ManagementData =
-            serde_cbor::from_slice(msg.as_bytes()).expect("Unable to deserialize ManagementData");
+            serde_cbor::from_slice(&data).expect("Unable to deserialize ManagementData");
 
         // Next step in the managment request process
         match req.cmd {
@@ -151,17 +190,21 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Re
     // Get the sender/reciever associated with this particular task
     let (sender, receiver) = unbounded::<Event>();
 
-    // Handle reciever end
+    // Client mutex
     let client: AdminClient = Default::default();
     let from_broker_client = client.clone();
 
-    // Client filter
-    let client_filter = warp::any().map(move || client.clone());
+    // Set up server
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", settings.port))
+        .await
+        .unwrap();
 
     tokio::task::spawn(async move {
         let c = from_broker_client;
 
         while let Ok(event) = receiver.recv_async().await {
+            log::info!("{:?}", event);
+
             let data = match event {
                 Event::OtaUpdateImageListRequestResponse(r) => match serde_cbor::to_vec(&r) {
                     Ok(v) => v,
@@ -191,7 +234,7 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Re
             };
 
             if let Some(c) = c.lock().await.as_ref() {
-                if let Err(e) = c.send_async(Ok(Message::binary(data))).await {
+                if let Err(e) = c.send_async(Ok(tungstenite::Message::binary(data))).await {
                     log::error!("Unabe to send message to admin! Err: {}", e);
                 };
             }
@@ -206,34 +249,16 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Re
         })
         .await?;
 
-    // ! Important: this leaks the api_key into the exact function. As long as this is only called once
-    // it's NBD.
-    let stream = warp::get()
-        .and(warp::path("socket"))
-        .and(warp::header::exact(
-            "ApiKey",
-            Box::leak(settings.api_key.clone().into_boxed_str()),
+    loop {
+        let (stream, _) = listener.accept().await?;
+        tokio::task::spawn(handle_connection(
+            stream,
+            sender.clone(),
+            settings.clone(),
+            client.clone(),
         ))
-        .and(warp::ws())
-        .and(client_filter)
-        .map(move |ws: warp::ws::Ws, client: AdminClient| {
-            log::debug!("Before upgrade..");
-
-            let broker_sender = broker_sender.clone();
-
-            // And then our closure will be called when it completes...
-            ws.on_upgrade(|socket| {
-                // handle the connection
-                handle_connection(broker_sender, socket, client)
-            })
-        });
-
-    // Run the `warp` server
-    warp::serve(stream)
-        .run(([127, 0, 0, 1], settings.port))
-        .await;
-
-    Ok(())
+        .await?;
+    }
 }
 
 // TODO: (test) try to send an "other" managment_request (gets forwarded to the application.)
