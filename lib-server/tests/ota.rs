@@ -21,19 +21,22 @@ fn setup() {
 fn get_update(major: u8, minor: u8, patch: u8) -> OTAUpdate {
     let hash: [u8; 8] = [103, 57, 54, 53, 98, 57, 100, 102];
     let image: [u8; 4] = [0, 0, 0, 0];
+    let version = OTAPackageVersion {
+        major: major,
+        minor: minor,
+        patch: patch,
+        commit: 0,
+        hash: hash.into(),
+    };
 
     let package = OTAPackage {
-        version: OTAPackageVersion {
-            major: major,
-            minor: minor,
-            patch: patch,
-            commit: 0,
-            hash: hash.into(),
-        },
+        id: version.to_string(),
+        version,
         file: Some(OTAImageData {
             data: image.to_vec(),
             image_type: OTAImageType::Primary,
         }),
+        size: image.len(),
         date_added: Utc::now(),
     };
 
@@ -191,7 +194,7 @@ async fn test_ota_request_check_event_not_found() {
 
     // New OTA package event
     let event = Event::OtaRequest {
-        device_id: "1234".to_string(),
+        device_uid: "1234".to_string(),
         msg: OtaRequest {
             cmd: OtaRequestCmd::Check,
             ..Default::default()

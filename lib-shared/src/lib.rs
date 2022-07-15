@@ -9,9 +9,6 @@ use clap::Parser;
 // Modules
 pub mod ota;
 
-// Default version
-pub const DEFAULT_OTA_VERSION: &str = "2";
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OtaImageListResponse {
     pub images: Vec<(String, OTAPackage)>,
@@ -103,7 +100,4 @@ pub struct OtaLink {
     pub group_id: Option<String>,
     /// Image id to be directed to
     pub image_id: Option<String>,
-    /// Ota version
-    #[clap(long, default_value = DEFAULT_OTA_VERSION)]
-    pub ota_version: u8,
 }

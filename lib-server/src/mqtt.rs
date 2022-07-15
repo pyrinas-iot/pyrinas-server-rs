@@ -56,12 +56,6 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
             target = t.trim_end_matches('/').trim_start_matches('/');
         }
 
-        // Continue if pub. 'sub' are sent to clients
-        if pub_sub != "pub" {
-            log::warn!("Pubsub not 'pub'. Value: {}", pub_sub);
-            continue;
-        }
-
         // Go over each payload
         for payload in msg.payload {
             match event_type {
@@ -78,7 +72,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                             // Send message to broker
                             broker_sender
                                 .send_async(Event::OtaRequest {
-                                    device_id: device_id.to_string(),
+                                    device_uid: device_id.to_string(),
                                     msg: n,
                                 })
                                 .await
@@ -150,12 +144,39 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 log::debug!("Event::ApplicationResponse");
 
                 // Generate topic
-                // TODO: make these configurable
-                let sub_topic = format!("{}/app/sub/{}", data.uid, data.target);
+                let sub_topic = format!("{}/app/s/{}", data.uid, data.target);
 
                 // Publish to the UID in question
-                // TODO: wrap this guy up in a separate spawn so it can get back to work.
                 if let Err(e) = tx.publish(&sub_topic, false, data.msg).await {
+                    log::error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                } else {
+                    log::debug!("Published to {}", sub_topic);
+                }
+            }
+            Event::OtaDownloadResponse(mut download) => {
+                log::debug!("mqtt_run: Event::OtaDownload");
+
+                let device_uid = match download.device_uid {
+                    Some(id) => id,
+                    None => {
+                        log::error!("Device ID must be defined.");
+                        continue;
+                    }
+                };
+
+                // Setting to none no matter what
+                download.device_uid = None;
+
+                // Generate topic
+                let sub_topic = format!("{}/ota/s/d", device_uid);
+
+                // Encode
+                let res = serde_cbor::ser::to_vec_packed(&download).unwrap();
+
+                log::debug!("Publishing message to {}", &sub_topic);
+
+                // Publish to the UID in question
+                if let Err(e) = tx.publish(&sub_topic, false, res).await {
                     log::error!("Unable to publish to {}. Error: {}", sub_topic, e);
                 } else {
                     log::debug!("Published to {}", sub_topic);
@@ -165,10 +186,14 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 log::debug!("mqtt_run: Event::OtaResponse");
 
                 // Depending on version, convert appropriately!
-                let (res, device_id) = {
+                let (res, device_uid) = {
                     // Get the package. Subtitute with empty one if not valid.
                     let res = match update.package {
-                        Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
+                        Some(mut p) => {
+                            log::debug!("{:?}", p);
+                            p.file = None;
+                            serde_cbor::ser::to_vec_packed(&p).unwrap()
+                        }
                         None => Vec::new(),
                     };
 
@@ -184,7 +209,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 };
 
                 // Generate topic
-                let sub_topic = format!("{}/ota/sub", device_id);
+                let sub_topic = format!("{}/ota/s", device_uid);
 
                 log::debug!("Publishing message to {}", &sub_topic);
 

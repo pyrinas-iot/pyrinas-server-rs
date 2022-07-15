@@ -83,7 +83,7 @@ pub fn init_trees(db: &sled::Db) -> Result<OTADatabase, Error> {
 pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, event: &Event) {
     match event {
         // Process OtaRequests
-        Event::OtaRequest { device_id, msg } => {
+        Event::OtaRequest { device_uid, msg } => {
             log::debug!("sled_run: Event::OtaRequest");
 
             // Do something different depending on the situation
@@ -98,10 +98,9 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                     log::info!("Check!");
 
                     // Lookup
-                    let package = match get_ota_update_by_device_id(db, device_id).ok() {
+                    let package = match get_ota_update_by_device_id(db, device_uid).ok() {
                         Some(update) => match update.package {
-                            Some(p) => {
-                                let mut package = p.clone();
+                            Some(mut package) => {
                                 package.file = None;
                                 Some(package)
                             }
@@ -115,8 +114,8 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
 
                     // Map the OTA update depending on version
                     let update = OTAUpdate {
-                        device_uid: Some(device_id.clone()),
-                        package: package,
+                        device_uid: Some(device_uid.clone()),
+                        package,
                     };
 
                     // Send it
@@ -157,13 +156,14 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                                 return;
                             }
                         },
+                        device_uid: Some(device_uid.to_string()),
                         ..Default::default()
                     };
 
                     // Get slice of binary
                     data.data = match update.package {
                         Some(package) => {
-                            let file = match package.file {
+                            let mut file = match package.file {
                                 Some(f) => f,
                                 None => {
                                     log::warn!("End position invalid!");
@@ -180,10 +180,7 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                                 return;
                             }
 
-                            file.data
-                                .clone()
-                                .drain(data.start_pos..data.end_pos)
-                                .collect()
+                            file.data.drain(data.start_pos..data.end_pos).collect()
                         }
                         None => {
                             log::warn!("No image data!");
@@ -299,7 +296,6 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
             }
 
             // If a device has been pushed, send that device the update
-            // TODO: done in a separate function call?
             if let Some(device_id) = device_id {
                 // Gather update information and then send it off to the device
                 let mut update = match get_ota_update_by_device_id(db, device_id) {
@@ -312,6 +308,15 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
 
                 // Set device id
                 update.device_uid = Some(device_id.to_string());
+
+                // Remove the file contents
+                update.package = match update.package {
+                    Some(mut p) => {
+                        p.file = None;
+                        Some(p)
+                    }
+                    None => None,
+                };
 
                 // Notify mqtt to send update!
                 broker_sender

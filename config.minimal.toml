@@ -1,6 +1,6 @@
 [mqtt]
 name = "test-server"
-topics = ["+/app/pub/#"]
+topics = ["+/app/p/#"]
 
 [mqtt.rumqtt]
 id = 0

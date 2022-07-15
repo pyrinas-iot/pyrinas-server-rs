@@ -138,9 +138,9 @@ pub struct OtaAdd {
     /// Device group also set to device id.
     #[clap(long, short)]
     pub device_id: Option<String>,
-    ///  Optional version flag
-    #[clap(long, default_value = pyrinas_shared::DEFAULT_OTA_VERSION)]
-    pub ota_version: u8,
+    /// Optional path to binary file
+    #[clap(long, short)]
+    pub bin: Option<String>,
 }
 
 /// Remove a OTA package from the sever

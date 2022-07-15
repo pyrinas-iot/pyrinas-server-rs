@@ -107,7 +107,7 @@ async fn handle_connection(
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaUpdate");
 
                 // Send if decode was successful
-                let _ = broker_sender
+                broker_sender
                     .send_async(Event::OtaNewPackage(ota_update))
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");
@@ -118,7 +118,7 @@ async fn handle_connection(
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
 
                 // Send if decode was successful
-                let _ = broker_sender
+                broker_sender
                     .send_async(Event::OtaLink {
                         device_id: a.device_id,
                         group_id: a.group_id,
@@ -138,7 +138,7 @@ async fn handle_connection(
                 };
 
                 // Send if decode was successful
-                let _ = broker_sender
+                broker_sender
                     .send_async(Event::OtaDeletePackage(image_id))
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");
@@ -156,7 +156,7 @@ async fn handle_connection(
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
 
                 // Send if decode was successful
-                let _ = broker_sender
+                broker_sender
                     .send_async(Event::OtaUnlink {
                         device_id: a.device_id,
                         group_id: a.group_id,
@@ -253,7 +253,7 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Re
         let (stream, _) = listener.accept().await?;
         tokio::task::spawn(handle_connection(
             stream,
-            sender.clone(),
+            broker_sender.clone(),
             settings.clone(),
             client.clone(),
         ))

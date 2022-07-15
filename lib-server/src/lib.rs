@@ -184,7 +184,7 @@ pub enum Event {
         image_id: Option<String>,
     }, // Associate device with update
     OtaRequest {
-        device_id: String,
+        device_uid: String,
         msg: OtaRequest,
     },
     OtaResponse(OTAUpdate),

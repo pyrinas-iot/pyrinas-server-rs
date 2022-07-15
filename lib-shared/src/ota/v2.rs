@@ -30,10 +30,14 @@ impl fmt::Display for OTADeviceType {
 // Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OTAPackage {
+    /// Identifier for OTA package
+    pub id: String,
     /// Version information
     pub version: OTAPackageVersion,
     /// All files associated with this package
     pub file: Option<OTAImageData>,
+    /// Size of image
+    pub size: usize,
     /// Timestamp for tracking when this was added
     pub date_added: DateTime<Utc>,
 }
@@ -49,6 +53,9 @@ pub struct OTADownload {
     pub data: Vec<u8>,
     /// Length of data
     pub len: usize,
+    /// Unique ID of the device this may get sent to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_uid: Option<String>,
 }
 
 impl fmt::Display for OTAPackage {

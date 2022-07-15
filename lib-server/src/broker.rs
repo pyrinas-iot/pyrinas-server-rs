@@ -53,7 +53,9 @@ pub async fn run(broker_reciever: Receiver<Event>) {
                     log::error!("{}", e);
                 }
             }
-            Event::ApplicationResponse(_) | Event::OtaResponse(_) => {
+            Event::ApplicationResponse(_)
+            | Event::OtaResponse(_)
+            | Event::OtaDownloadResponse(_) => {
                 debug!("broker_run: ApplicationResponse");
                 // Send to mqtt handler
                 if let Err(e) = send("mqtt", &event, &mut runners).await {

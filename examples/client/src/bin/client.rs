@@ -37,7 +37,7 @@ async fn main() {
     tokio::spawn(async move {
         loop {
             client
-                .publish("1234/app/pub/env", QoS::AtLeastOnce, false, data.clone())
+                .publish("1234/app/p/env", QoS::AtLeastOnce, false, data.clone())
                 .await
                 .unwrap();
             tokio::time::sleep(Duration::from_secs(3)).await;

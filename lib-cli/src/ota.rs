@@ -48,6 +48,10 @@ pub enum Error {
     #[error("repository is dirty. Run --force to override")]
     DirtyError,
 
+    /// Error to indicate file(s) not found
+    #[error("update not found")]
+    UpdateNotFoundError,
+
     /// Error for git related commands
     #[error("{source}")]
     GitError {
@@ -63,7 +67,7 @@ pub fn process(
 ) -> Result<(), Error> {
     match cmd {
         OtaSubCommand::Add(a) => {
-            let image_id = crate::ota::add_ota(socket, a.force)?;
+            let image_id = crate::ota::add_ota(socket, &a.bin, a.force)?;
 
             println!("{} image successfully uploaded!", &image_id);
 
@@ -74,7 +78,6 @@ pub fn process(
                         device_id: Some(device_id.clone()),
                         group_id: Some(device_id.to_string()),
                         image_id: Some(image_id),
-                        ota_version: a.ota_version,
                     };
 
                     crate::ota::link(socket, &a)?;
@@ -192,6 +195,7 @@ pub fn process(
 /// Adds and OTA image from an included manifest file to the server
 pub fn add_ota(
     stream: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    file_path: &Option<String>,
     force: bool,
 ) -> Result<String, Error> {
     // Get the current version using 'git describe'
@@ -206,11 +210,31 @@ pub fn add_ota(
     }
 
     // Path for ota
-    let path = "./build/zephyr/app_update.bin";
+    let mut paths = vec![
+        "./build/zephyr/app_update.bin",
+        "./build/zephyr/zephyr.signed.bin",
+    ];
+
+    if let Some(path) = file_path {
+        paths.clear();
+        paths.push(path);
+    }
 
     // Read image in as data
     let mut buf: Vec<u8> = Vec::new();
-    let mut file = File::open(&path)?;
+    let mut file: Option<File> = None;
+    for entry in paths {
+        if let Ok(f) = File::open(&entry) {
+            file = Some(f);
+        }
+    }
+
+    // Return error if not found
+    let mut file = match file {
+        Some(f) => f,
+        None => return Err(Error::UpdateNotFoundError),
+    };
+
     let size = file.read_to_end(&mut buf)?;
 
     println!("Reading {} bytes from firmware update binary.", size);
@@ -219,11 +243,13 @@ pub fn add_ota(
     let new = OTAUpdate {
         device_uid: None,
         package: Some(OTAPackage {
+            id: package_version.to_string(),
             version: package_version.clone(),
             file: Some(OTAImageData {
                 data: buf,
                 image_type: OTAImageType::Primary,
             }),
+            size,
             date_added: Utc::now(),
         }),
     };
