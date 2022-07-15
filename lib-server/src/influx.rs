@@ -4,9 +4,6 @@ use crate::{settings, Event};
 // async Related
 use flume::{unbounded, Sender};
 
-// Tokio compat
-use tokio_compat_02::FutureExt;
-
 // Influx Related
 use influxdb::Client;
 
@@ -37,7 +34,7 @@ pub async fn run(settings: &settings::Influx, broker_sender: Sender<Event>) {
             Event::InfluxDataSave(query) => {
                 log::debug!("influx_run: InfluxDataSave");
                 // Create the query. Shows error if it fails
-                if let Err(e) = client.query(&query).compat().await {
+                if let Err(e) = client.query(&query).await {
                     log::error!("Unable to write query. Error: {}", e);
                 }
             }

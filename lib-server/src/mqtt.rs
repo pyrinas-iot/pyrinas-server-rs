@@ -1,5 +1,5 @@
 // Sytem related
-use log::{debug, error, warn};
+use log;
 
 // async related
 use flume::{unbounded, Sender};
@@ -58,7 +58,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
 
         // Continue if pub. 'sub' are sent to clients
         if pub_sub != "pub" {
-            warn!("Pubsub not 'pub'. Value: {}", pub_sub);
+            log::warn!("Pubsub not 'pub'. Value: {}", pub_sub);
             continue;
         }
 
@@ -73,7 +73,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                     // Match function to handle error
                     match res {
                         Ok(n) => {
-                            debug!("{:?}", n);
+                            log::debug!("{:?}", n);
 
                             // Send message to broker
                             broker_sender
@@ -84,7 +84,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                                 .await
                                 .unwrap();
                         }
-                        Err(e) => error!("OTA decode error: {}", e),
+                        Err(e) => log::error!("OTA decode error: {}", e),
                     }
                 }
                 "tel" => {
@@ -95,7 +95,7 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                     // Match function to handle error
                     match res {
                         Ok(n) => {
-                            debug!("{:?}", n);
+                            log::debug!("{:?}", n);
 
                             // Create query
                             let query = n
@@ -108,11 +108,11 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                                 .await
                                 .unwrap();
                         }
-                        Err(e) => error!("Telemetry decode error: {}", e),
+                        Err(e) => log::error!("Telemetry decode error: {}", e),
                     }
                 }
                 "app" => {
-                    debug!("app: from:{:?}", device_id.to_string());
+                    log::debug!("app: from:{:?}", device_id.to_string());
 
                     // Send data to broker
                     broker_sender
@@ -147,7 +147,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
         // Only process OtaNewPackage eventss
         match event {
             Event::ApplicationResponse(data) => {
-                debug!("Event::ApplicationResponse");
+                log::debug!("Event::ApplicationResponse");
 
                 // Generate topic
                 // TODO: make these configurable
@@ -156,60 +156,43 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 // Publish to the UID in question
                 // TODO: wrap this guy up in a separate spawn so it can get back to work.
                 if let Err(e) = tx.publish(&sub_topic, false, data.msg).await {
-                    error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                    log::error!("Unable to publish to {}. Error: {}", sub_topic, e);
                 } else {
-                    debug!("Published to {}", sub_topic);
+                    log::debug!("Published to {}", sub_topic);
                 }
             }
             Event::OtaResponse(update) => {
-                debug!("mqtt_run: Event::OtaResponse");
+                log::debug!("mqtt_run: Event::OtaResponse");
 
                 // Depending on version, convert appropriately!
-                let (res, device_id) = match (update.v1, update.v2) {
-                    (None, Some(update)) => {
-                        // Device id
-                        let device_id = match update.uid {
-                            Some(id) => id,
-                            None => {
-                                log::warn!("No device id!");
-                                continue;
-                            }
-                        };
+                let (res, device_id) = {
+                    // Get the package. Subtitute with empty one if not valid.
+                    let res = match update.package {
+                        Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
+                        None => Vec::new(),
+                    };
 
-                        // Get the package. Subtitute with empty one if not valid.
-                        let res = match update.package {
-                            Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
-                            None => Vec::new(),
-                        };
+                    let device_uid = match update.device_uid {
+                        Some(uid) => uid,
+                        None => {
+                            log::warn!("Device ID unknown");
+                            continue;
+                        }
+                    };
 
-                        (res, device_id)
-                    }
-                    (Some(update), None) => {
-                        // Get the package. Subtitute with empty one if not valid.
-                        let res = match update.package {
-                            Some(p) => serde_cbor::ser::to_vec_packed(&p).unwrap(),
-                            None => Vec::new(),
-                        };
-
-                        (res, update.uid)
-                    }
-                    (..) => {
-                        log::warn!("Invalid OtaResponse!");
-                        continue;
-                    }
+                    (res, device_uid)
                 };
 
                 // Generate topic
-                // TODO: make these configurable
                 let sub_topic = format!("{}/ota/sub", device_id);
 
-                debug!("Publishing message to {}", &sub_topic);
+                log::debug!("Publishing message to {}", &sub_topic);
 
                 // Publish to the UID in question
                 if let Err(e) = tx.publish(&sub_topic, false, res).await {
-                    error!("Unable to publish to {}. Error: {}", sub_topic, e);
+                    log::error!("Unable to publish to {}. Error: {}", sub_topic, e);
                 } else {
-                    debug!("Published to {}", sub_topic);
+                    log::debug!("Published to {}", sub_topic);
                 }
             }
             _ => (),

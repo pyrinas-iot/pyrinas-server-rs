@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::sync::Arc;
 
 // async Related
@@ -13,7 +12,7 @@ use warp::{ws::WebSocket, Filter};
 // Local lib related
 use crate::settings;
 use crate::Event;
-use pyrinas_shared::{ota::OtaVersion, ManagmentDataType};
+use pyrinas_shared::ManagmentDataType;
 
 // Cbor
 use serde_cbor;
@@ -65,7 +64,7 @@ async fn handle_connection(
         match req.cmd {
             ManagmentDataType::AddOta => {
                 // Dedcode ota update
-                let ota_update: pyrinas_shared::ota::v2::OtaUpdate =
+                let ota_update: pyrinas_shared::ota::v2::OTAUpdate =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaUpdate");
 
                 // Send if decode was successful
@@ -79,18 +78,12 @@ async fn handle_connection(
                 let a: pyrinas_shared::OtaLink =
                     serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
 
-                let ver = match a.ota_version.try_into() {
-                    Ok(v) => v,
-                    Err(_) => OtaVersion::V2,
-                };
-
                 // Send if decode was successful
                 let _ = broker_sender
                     .send_async(Event::OtaLink {
                         device_id: a.device_id,
                         group_id: a.group_id,
                         image_id: a.image_id,
-                        ota_version: ver,
                     })
                     .await
                     .expect("Unable to send OtaNewPackage to broker.");

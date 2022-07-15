@@ -14,7 +14,7 @@ use influxdb::{ReadQuery, WriteQuery};
 
 // Async Related
 use flume::{Receiver, Sender};
-use pyrinas_shared::ota::{v2::OtaUpdate, OtaUpdateVersioned, OtaVersion};
+use pyrinas_shared::ota::v2::{OTADownload, OTAUpdate};
 use std::{io, sync::Arc};
 
 // Runtime
@@ -109,11 +109,6 @@ pub async fn run(
         ota::run(&task_settings.ota, task_sender).await;
     });
 
-    let task_settings = settings.clone();
-    task::spawn(async move {
-        ota::ota_http_run(&task_settings.ota).await;
-    });
-
     // Clone these appropriately
     let task_sender = broker_sender.clone();
     let task_settings = settings.clone();
@@ -178,7 +173,7 @@ pub enum Event {
         sender: Sender<Event>,
     },
     OtaDeletePackage(String),
-    OtaNewPackage(OtaUpdate),
+    OtaNewPackage(OTAUpdate),
     OtaUnlink {
         device_id: Option<String>,
         group_id: Option<String>,
@@ -187,13 +182,13 @@ pub enum Event {
         device_id: Option<String>,
         group_id: Option<String>,
         image_id: Option<String>,
-        ota_version: OtaVersion,
     }, // Associate device with update
     OtaRequest {
         device_id: String,
         msg: OtaRequest,
     },
-    OtaResponse(OtaUpdateVersioned),
+    OtaResponse(OTAUpdate),
+    OtaDownloadResponse(OTADownload),
     OtaUpdateImageListRequest(), // Simple request to get all the firmware image information (id, name, desc, etc)
     OtaUpdateImageListRequestResponse(OtaImageListResponse), // Message sent to show all the avilable OTA updates
     OtaUpdateGroupListRequest(), // Simple request to get a list of all the groups with their memebers

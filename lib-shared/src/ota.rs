@@ -1,30 +1,8 @@
-pub mod v1;
 pub mod v2;
 
-use std::{convert::TryFrom, fmt, str};
+use std::{fmt, str};
 
 use serde::{Deserialize, Serialize};
-use serde_repr::*;
-
-/// Determine which OTAPackage being used
-#[derive(Debug, Serialize_repr, Deserialize_repr, Clone, Eq, PartialEq)]
-#[repr(u8)]
-pub enum OtaVersion {
-    V1 = 1,
-    V2 = 2,
-}
-
-impl TryFrom<u8> for OtaVersion {
-    type Error = ();
-
-    fn try_from(v: u8) -> Result<Self, Self::Error> {
-        match v {
-            x if x == OtaVersion::V1 as u8 => Ok(OtaVersion::V1),
-            x if x == OtaVersion::V2 as u8 => Ok(OtaVersion::V2),
-            _ => Err(()),
-        }
-    }
-}
 
 /// Struct that gets serialized for OTA support
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -50,11 +28,4 @@ impl fmt::Display for OTAPackageVersion {
             self.major, self.minor, self.patch, self.commit, hash
         )
     }
-}
-
-/// Used for passing different verioned ota data
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OtaUpdateVersioned {
-    pub v1: Option<v1::OtaUpdate>,
-    pub v2: Option<v2::OtaUpdate>,
 }

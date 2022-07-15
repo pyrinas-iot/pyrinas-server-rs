@@ -43,4 +43,3 @@ tokio-stream = { version = "0.1", features = [
     "net",
 ] } # tokio stream (removed from mainline tokio until future)
 warp = { version = "0.3" } # Webserver for hosting OTA files
-tokio-compat-02 = { version = "0.2.0" }

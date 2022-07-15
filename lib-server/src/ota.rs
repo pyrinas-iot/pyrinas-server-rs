@@ -1,21 +1,10 @@
 // async Related
 use flume::{unbounded, Sender};
-use pyrinas_shared::ota::{self, OtaUpdateVersioned, OtaVersion};
-use std::io::Write;
-use std::net::{Ipv4Addr, SocketAddrV4};
-
-// Std
-use std::fs::{self, File};
 
 // Local lib related
 use crate::{settings, Event};
-use pyrinas_shared::ota::v2::{
-    OTAImageData, OTAImageType, OTAPackage, OTAPackageFileInfo, OtaUpdate,
-};
+use pyrinas_shared::ota::v2::{OTADownload, OTAUpdate};
 use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse, OtaRequestCmd};
-
-// warp
-use warp::{self, Filter};
 
 // Error
 use crate::Error;
@@ -31,7 +20,7 @@ pub struct OTADatabase {
 }
 
 /// Get the OTA package from database by `update_id`
-pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage, Error> {
+pub fn get_ota_update(db: &OTADatabase, update_id: &str) -> Result<OTAUpdate, Error> {
     // Check if there's a package available and ready
     let entry = match db.images.get(&update_id)? {
         Some(e) => e,
@@ -41,12 +30,12 @@ pub fn get_ota_package(db: &OTADatabase, update_id: &str) -> Result<OTAPackage, 
     };
 
     // Deserialize it
-    let package: OTAPackage = serde_cbor::de::from_slice(&entry)?;
+    let package: OTAUpdate = serde_cbor::de::from_slice(&entry)?;
     Ok(package)
 }
 
 /// Get the OTA package by device ID
-fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAPackage, Error> {
+fn get_ota_update_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAUpdate, Error> {
     // Get the group_id
     let group_id: String = match db.devices.get(&device_id)? {
         Some(e) => String::from_utf8(e.to_vec())?,
@@ -70,17 +59,14 @@ fn get_ota_package_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTA
     };
 
     // Check if there's a package available and ready
-    let mut package: OTAPackage = match db.images.get(&image_id)? {
+    let update: OTAUpdate = match db.images.get(&image_id)? {
         Some(e) => serde_cbor::from_slice(&e)?,
         None => {
             return Err(Error::CustomError("No data available.".to_string()));
         }
     };
 
-    // Remove timestamp
-    package.date_added = None;
-
-    Ok(package)
+    Ok(update)
 }
 
 /// Used to initialize the separate trees involved in the database.
@@ -94,12 +80,7 @@ pub fn init_trees(db: &sled::Db) -> Result<OTADatabase, Error> {
 }
 
 /// Function that is called outside of the thread so it can be tested separately.
-pub async fn process_event(
-    settings: &settings::Ota,
-    broker_sender: &Sender<Event>,
-    db: &OTADatabase,
-    event: &Event,
-) {
+pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, event: &Event) {
     match event {
         // Process OtaRequests
         Event::OtaRequest { device_id, msg } => {
@@ -114,48 +95,110 @@ pub async fn process_event(
                     // TODO: clean up here
                 }
                 OtaRequestCmd::Check => {
-                    log::debug!("Check!");
+                    log::info!("Check!");
 
                     // Lookup
-                    let package = get_ota_package_by_device_id(db, device_id).ok();
-
-                    // Get version. No version? Must be v1
-                    let version = match &msg.version {
-                        Some(v) => v.clone(),
-                        None => OtaVersion::V1,
+                    let package = match get_ota_update_by_device_id(db, device_id).ok() {
+                        Some(update) => match update.package {
+                            Some(p) => {
+                                let mut package = p.clone();
+                                package.file = None;
+                                Some(package)
+                            }
+                            None => {
+                                log::warn!("No package found!");
+                                None
+                            }
+                        },
+                        None => None,
                     };
 
                     // Map the OTA update depending on version
-                    let update = match version {
-                        pyrinas_shared::ota::OtaVersion::V1 => {
-                            // Get package data and transform it into a V1
-                            let package: Option<ota::v1::OTAPackage> = match package {
-                                Some(p) => p.into(),
-                                None => None,
-                            };
-
-                            OtaUpdateVersioned {
-                                v1: Some(ota::v1::OtaUpdate {
-                                    uid: device_id.clone(),
-                                    package,
-                                    image: None,
-                                }),
-                                v2: None,
-                            }
-                        }
-                        pyrinas_shared::ota::OtaVersion::V2 => OtaUpdateVersioned {
-                            v1: None,
-                            v2: Some(OtaUpdate {
-                                uid: Some(device_id.clone()),
-                                package,
-                                images: None,
-                            }),
-                        },
+                    let update = OTAUpdate {
+                        device_uid: Some(device_id.clone()),
+                        package: package,
                     };
 
                     // Send it
                     broker_sender
                         .send_async(Event::OtaResponse(update))
+                        .await
+                        .unwrap();
+                }
+                OtaRequestCmd::DownloadBytes => {
+                    let update_id = match &msg.id {
+                        Some(v) => v,
+                        None => {
+                            log::warn!("Start position invalid!");
+                            return;
+                        }
+                    };
+
+                    let update = match get_ota_update(db, update_id) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            log::warn!("File not found! Err: {}", e);
+                            return;
+                        }
+                    };
+
+                    let mut data: OTADownload = OTADownload {
+                        start_pos: match msg.start_pos {
+                            Some(v) => v,
+                            None => {
+                                log::warn!("Start position invalid!");
+                                return;
+                            }
+                        },
+                        end_pos: match msg.end_pos {
+                            Some(v) => v,
+                            None => {
+                                log::warn!("End position invalid!");
+                                return;
+                            }
+                        },
+                        ..Default::default()
+                    };
+
+                    // Get slice of binary
+                    data.data = match update.package {
+                        Some(package) => {
+                            let file = match package.file {
+                                Some(f) => f,
+                                None => {
+                                    log::warn!("End position invalid!");
+                                    return;
+                                }
+                            };
+
+                            if data.end_pos > file.data.len() - 1 {
+                                log::warn!(
+                                    "Out of bounds! Start: {} End: {}",
+                                    data.start_pos,
+                                    data.end_pos
+                                );
+                                return;
+                            }
+
+                            file.data
+                                .clone()
+                                .drain(data.start_pos..data.end_pos)
+                                .collect()
+                        }
+                        None => {
+                            log::warn!("No image data!");
+                            return;
+                        }
+                    };
+
+                    // Get length
+                    data.len = data.data.len();
+
+                    log::info!("Data: {} {} {}", data.start_pos, data.end_pos, data.len);
+
+                    // Send it
+                    broker_sender
+                        .send_async(Event::OtaDownloadResponse(data))
                         .await
                         .unwrap();
                 }
@@ -194,7 +237,6 @@ pub async fn process_event(
             device_id,
             group_id,
             image_id,
-            ota_version,
         } => {
             // Match the different possiblities
             match (&device_id, &group_id, &image_id) {
@@ -258,34 +300,18 @@ pub async fn process_event(
 
             // If a device has been pushed, send that device the update
             // TODO: done in a separate function call?
-            if let Some(device) = device_id {
+            if let Some(device_id) = device_id {
                 // Gather update information and then send it off to the device
-                let package = match get_ota_package_by_device_id(db, device) {
-                    Ok(p) => p,
+                let mut update = match get_ota_update_by_device_id(db, device_id) {
+                    Ok(u) => u,
                     Err(e) => {
                         log::warn!("Unable to get OTA package: Error: {}", e);
                         return;
                     }
                 };
 
-                let update = match ota_version {
-                    OtaVersion::V1 => OtaUpdateVersioned {
-                        v1: None,
-                        v2: Some(OtaUpdate {
-                            uid: Some(device.to_string()),
-                            package: Some(package),
-                            images: None,
-                        }),
-                    },
-                    OtaVersion::V2 => OtaUpdateVersioned {
-                        v1: None,
-                        v2: Some(OtaUpdate {
-                            uid: Some(device.to_string()),
-                            package: Some(package),
-                            images: None,
-                        }),
-                    },
-                };
+                // Set device id
+                update.device_uid = Some(device_id.to_string());
 
                 // Notify mqtt to send update!
                 broker_sender
@@ -298,60 +324,10 @@ pub async fn process_event(
         Event::OtaNewPackage(update) => {
             log::debug!("sled_run: Event::OtaNewPackage");
 
-            // Get the package
-            let mut package = match &update.package {
-                Some(p) => p.clone(),
-                None => {
-                    log::error!("Package must exist!");
-                    return;
-                }
-            };
-
-            // Save image to file before we muck with the OtaUpdate
-            let images = match &update.images {
-                Some(i) => i,
-                None => {
-                    // There should be image data..
-                    log::error!("Image(s) not valid!");
-                    return;
-                }
-            };
-
-            // Update ID
-            let update_id = package.to_string();
-
-            // Vector of file information
-            let mut files: Vec<OTAPackageFileInfo> = Vec::new();
-
-            // Save each of the images with the type attached to it as well.
-            for image in images {
-                if let Err(e) =
-                    save_ota_firmware_image(&settings.image_path, &update_id, image).await
-                {
-                    log::error!("Unable to save OTA firmware image. Err: {}", e);
-                    return;
-                }
-
-                // Add image data to the Ota Package
-                files.push(OTAPackageFileInfo {
-                    image_type: image.image_type,
-                    host: format!("https://{}", &settings.url),
-                    file: format!("images/{}/{}.bin", &update_id, &image.image_type),
-                });
-            }
-
-            // Set the files
-            package.files = files;
-
-            // Copy only useful stuff in update (no image binary data.)
-            let update = OtaUpdate {
-                uid: None,
-                package: Some(package.clone()),
-                images: None,
-            };
+            log::debug!("{:?}", update);
 
             // Save the OTA package to database
-            if let Err(e) = save_ota_package(db, &update).await {
+            if let Err(e) = save_ota_update(db, update).await {
                 log::error!("Unable to save OTA package. Error: {}", e);
             }
         }
@@ -359,7 +335,7 @@ pub async fn process_event(
             match update_id.as_str() {
                 // Delete all option
                 "*" => {
-                    if let Err(e) = delete_all_ota_data(db, settings).await {
+                    if let Err(e) = delete_all_ota_data(db).await {
                         log::warn!("Unable to delete all ota data. Err: {}", e);
                     }
                 }
@@ -369,12 +345,6 @@ pub async fn process_event(
                     if let Err(e) = delete_ota_package(db, update_id).await {
                         log::warn!("Unable to remove ota package for {}. Err: {}", update_id, e);
                     };
-
-                    // Delete folder
-                    if let Err(e) = delete_ota_firmware_image(&settings.image_path, update_id).await
-                    {
-                        log::warn!("Unable to removed files for {}. Err: {}", update_id, e);
-                    }
                 }
             };
         }
@@ -391,13 +361,18 @@ pub async fn process_event(
                 };
 
                 // Deserialize
-                let value: OTAPackage = match serde_cbor::from_slice(&v) {
+                let value: OTAUpdate = match serde_cbor::from_slice(&v) {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
 
+                let package = match value.package {
+                    Some(p) => p,
+                    None => continue,
+                };
+
                 // Add the image
-                response.images.push((key, value));
+                response.images.push((key, package));
             }
 
             // Notify mqtt to send update!
@@ -452,7 +427,7 @@ pub async fn run(settings: &settings::Ota, broker_sender: Sender<Event>) {
 
     // Wait for event on reciever
     while let Ok(event) = reciever.recv_async().await {
-        process_event(settings, &broker_sender, &db, &event).await;
+        process_event(&broker_sender, &db, &event).await;
     }
 }
 
@@ -472,13 +447,10 @@ async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<(), Error>
     Ok(())
 }
 
-async fn delete_all_ota_data(db: &OTADatabase, settings: &settings::Ota) -> Result<(), Error> {
+async fn delete_all_ota_data(db: &OTADatabase) -> Result<(), Error> {
     // Clear them first
     db.images.clear()?;
     db.images.flush_async().await?;
-
-    fs::remove_dir_all(&settings.image_path)?;
-
     Ok(())
 }
 
@@ -508,69 +480,21 @@ async fn associate_group_with_update(
     Ok(())
 }
 
-fn get_update_file_path(image_type: &OTAImageType, update_name: &str) -> String {
-    format!("{}/{}.bin", update_name, image_type)
-}
-
-/// Take binary data and save it to the image directory..
-pub async fn save_ota_firmware_image(
-    folder_path: &str,
-    name: &str,
-    image: &OTAImageData,
-) -> Result<(), Error> {
-    let base_path = format!("{}/{}", folder_path, name);
-
-    log::debug!("Base path: {}", base_path);
-
-    // Make directory if it doesn't exist...
-    if let Err(e) = fs::create_dir_all(&base_path) {
-        log::warn!("Unable to create image directory: {}", e);
-    }
-
-    let full_path = format!(
-        "{}/{}",
-        folder_path,
-        get_update_file_path(&image.image_type, name)
-    );
-
-    // Create the file
-    // Ideal path is something like "images//"
-    let mut file = File::create(full_path)?;
-
-    log::debug!("File path: {:?}", file);
-
-    // Write and sync
-    file.write_all(&image.data)?;
-    file.sync_all()?;
-
-    Ok(())
-}
-
-pub async fn delete_ota_firmware_image(path: &str, name: &str) -> Result<(), Error> {
-    // Delete the folder from the filesystem
-    fs::remove_dir_all(format!("{}/{}/", path, &name))?;
-
-    Ok(())
-}
-
 /// Creates the OTA package in the database and filesystem.
 ///
 /// This function overwrites any updates that may exist
-pub async fn save_ota_package(db: &OTADatabase, update: &OtaUpdate) -> Result<(), Error> {
+pub async fn save_ota_update(db: &OTADatabase, update: &OTAUpdate) -> Result<(), Error> {
     // Get the package
     let package = match &update.package {
         Some(p) => p,
         None => return Err(Error::CustomError("Package must exist!".to_string())),
     };
 
-    // Generate the update ID
-    let update_id = package.to_string();
-
     // Turn entry.package into CBOR
-    let cbor_data = serde_cbor::ser::to_vec_packed(&package)?;
+    let cbor_data = serde_cbor::ser::to_vec_packed(&update)?;
 
     // Check if insert worked ok
-    db.images.insert(&update_id, cbor_data)?;
+    db.images.insert(&package.to_string(), cbor_data)?;
     db.images.flush_async().await?;
 
     Ok(())
@@ -583,22 +507,4 @@ pub async fn delete_ota_package(db: &OTADatabase, update_id: &str) -> Result<(),
     db.images.flush_async().await?;
 
     Ok(())
-}
-
-/// Small server with one endpoint for handling OTA updates.
-/// i.e. hosts static firmware images that can be pulled by the
-/// firmware.
-pub async fn ota_http_run(settings: &settings::Ota) {
-    // TODO: API key for more secure transfers
-
-    // Only one folder that we're interested in..
-    let images = warp::path("images").and(warp::fs::dir(settings.image_path.clone()));
-
-    // Run the `warp` server
-    warp::serve(images)
-        .run(SocketAddrV4::new(
-            Ipv4Addr::new(127, 0, 0, 1),
-            settings.http_port,
-        ))
-        .await;
 }

@@ -1,7 +1,7 @@
 use chrono::{Duration, Local, Utc};
 
 // Pyrinas
-use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OtaUpdate};
+use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OTAUpdate};
 use pyrinas_shared::{
     ManagementData, ManagmentDataType, OtaGroupListResponse, OtaImageListResponse,
 };
@@ -172,10 +172,7 @@ pub fn process(
 
                         for (name, package) in list.images.iter() {
                             // Get the date
-                            let date = match package.date_added {
-                                Some(d) => d.with_timezone(&Local).to_string(),
-                                None => "".to_string(),
-                            };
+                            let date = package.date_added.with_timezone(&Local).to_string();
 
                             // Print out the entry
                             println!("{} {}", name, date);
@@ -219,20 +216,16 @@ pub fn add_ota(
     println!("Reading {} bytes from firmware update binary.", size);
 
     // Data structure (from pyrinas_lib_shared)
-    let new = OtaUpdate {
-        uid: None,
+    let new = OTAUpdate {
+        device_uid: None,
         package: Some(OTAPackage {
             version: package_version.clone(),
-            files: Vec::new(),
-            date_added: Some(Utc::now()),
-        }),
-        images: Some(
-            [OTAImageData {
+            file: Some(OTAImageData {
                 data: buf,
                 image_type: OTAImageType::Primary,
-            }]
-            .to_vec(),
-        ),
+            }),
+            date_added: Utc::now(),
+        }),
     };
 
     // Serialize to cbor

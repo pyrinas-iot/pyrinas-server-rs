@@ -1,6 +1,6 @@
 use std::str;
 
-use ota::{v2::OTAPackage, OtaVersion};
+use ota::v2::OTAPackage;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
@@ -22,18 +22,27 @@ pub struct OtaGroupListResponse {
     pub groups: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct OtaRequest {
+    /// Command type
     pub cmd: OtaRequestCmd,
-    pub version: Option<OtaVersion>,
+    /// Optional filename
+    pub id: Option<String>,
+    /// Start position
+    pub start_pos: Option<usize>,
+    /// End position
+    pub end_pos: Option<usize>,
+    // char file[PYRINAS_OTA_PACKAGE_MAX_FILE_PATH_CHARS];
 }
 
 // Note: uses special _repr functions for using Enum as int
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum OtaRequestCmd {
+    #[default]
     Check,
     Done,
+    DownloadBytes,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]

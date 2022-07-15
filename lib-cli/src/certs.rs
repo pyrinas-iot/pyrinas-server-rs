@@ -118,7 +118,7 @@ fn write_der_credential(
     port: &mut Box<dyn SerialPort>,
     tag: u32,
     kind: u32,
-    cert: &Vec<u8>,
+    cert: &[u8],
 ) -> Result<(), Error> {
     // Get the reader
     let mut reader = BufReader::new(port.try_clone()?);
@@ -180,7 +180,7 @@ fn write_der_credentials(
 ) -> Result<(), Error> {
     // First the CA cert
     if let Some(c) = &cert.ca_cert {
-        write_der_credential(port, cert.tag, 1, &c)?;
+        write_der_credential(port, cert.tag, 1, c)?;
 
         // Delay
         thread::sleep(std::time::Duration::from_secs(1));
@@ -188,7 +188,7 @@ fn write_der_credentials(
 
     // Then the device cert
     if let Some(c) = &cert.pub_key {
-        write_der_credential(port, cert.tag, 2, &c)?;
+        write_der_credential(port, cert.tag, 2, c)?;
 
         // Delay
         thread::sleep(std::time::Duration::from_secs(1));
@@ -196,7 +196,7 @@ fn write_der_credentials(
 
     // Then the private key
     if let Some(c) = &cert.private_key {
-        write_der_credential(port, cert.tag, 3, &c)?;
+        write_der_credential(port, cert.tag, 3, c)?;
 
         // Delay
         thread::sleep(std::time::Duration::from_secs(1));
@@ -281,7 +281,7 @@ fn write_credentials(
             }
 
             if line.contains("ERROR") {
-                return Err(Error::CustomError(format!("Unable to write CA cert.")));
+                return Err(Error::CustomError("Unable to write CA cert.".to_string()));
             }
         }
 
@@ -332,7 +332,9 @@ fn write_credentials(
             }
 
             if line.contains("ERROR") {
-                return Err(Error::CustomError(format!("Unable to write private key.")));
+                return Err(Error::CustomError(
+                    "Unable to write private key.".to_string(),
+                ));
             }
         }
 
@@ -382,7 +384,9 @@ fn write_credentials(
             }
 
             if line.contains("ERROR") {
-                return Err(Error::CustomError(format!("Unable to write public key.")));
+                return Err(Error::CustomError(
+                    "Unable to write public key.".to_string(),
+                ));
             }
         }
 

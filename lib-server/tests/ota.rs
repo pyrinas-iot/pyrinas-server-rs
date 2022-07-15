@@ -2,15 +2,13 @@ use chrono::Utc;
 // async Related
 use flume::unbounded;
 
-use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OtaUpdate};
-use pyrinas_shared::ota::{OTAPackageVersion, OtaVersion};
+use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OTAUpdate};
+use pyrinas_shared::ota::OTAPackageVersion;
 use pyrinas_shared::{OtaRequest, OtaRequestCmd};
 
+use pyrinas_server::ota;
 use pyrinas_server::Event;
-use pyrinas_server::{ota, settings};
 
-use std::convert::TryInto;
-use std::path::Path;
 use std::sync::Once;
 
 static INIT: Once = Once::new();
@@ -20,7 +18,7 @@ fn setup() {
     INIT.call_once(|| env_logger::init());
 }
 
-fn get_update(major: u8, minor: u8, patch: u8, has_secondary: bool) -> OtaUpdate {
+fn get_update(major: u8, minor: u8, patch: u8) -> OTAUpdate {
     let hash: [u8; 8] = [103, 57, 54, 53, 98, 57, 100, 102];
     let image: [u8; 4] = [0, 0, 0, 0];
 
@@ -32,39 +30,17 @@ fn get_update(major: u8, minor: u8, patch: u8, has_secondary: bool) -> OtaUpdate
             commit: 0,
             hash: hash.into(),
         },
-        files: Vec::new(),
-        date_added: Some(Utc::now()),
+        file: Some(OTAImageData {
+            data: image.to_vec(),
+            image_type: OTAImageType::Primary,
+        }),
+        date_added: Utc::now(),
     };
 
-    let mut images: Vec<OTAImageData> = Vec::new();
-
-    images.push(OTAImageData {
-        data: image.to_vec(),
-        image_type: OTAImageType::Primary,
-    });
-
-    if has_secondary {
-        images.push(OTAImageData {
-            data: image.to_vec(),
-            image_type: OTAImageType::Secondary,
-        });
-    }
-
     // Update
-    OtaUpdate {
-        uid: None,
+    OTAUpdate {
+        device_uid: None,
         package: Some(package),
-        images: Some(images),
-    }
-}
-
-fn get_default_settings() -> settings::Ota {
-    // Create settings
-    settings::Ota {
-        url: "localhost".to_string(),
-        db_path: ".".to_string(),
-        http_port: 8080,
-        image_path: "_images/".to_string(),
     }
 }
 
@@ -78,10 +54,10 @@ async fn save_ota_package_sucess() {
     let db = ota::init_trees(&db).unwrap();
 
     // Generate Update
-    let update = get_update(1, 0, 1, false);
+    let update = get_update(1, 0, 1);
 
-    // Test the save_ota_package
-    if let Err(e) = ota::save_ota_package(&db, &update).await {
+    // Test the save_ota_update
+    if let Err(e) = ota::save_ota_update(&db, &update).await {
         log::error!("Error: {}", e);
         assert!(false);
     }
@@ -91,25 +67,6 @@ async fn save_ota_package_sucess() {
 
     // Check the database to make sure there's an entry
     assert!(db.images.contains_key(&update_id).unwrap());
-
-    // Get the first element
-    let image = &update.images.unwrap()[0];
-
-    // Save the image to disk
-    ota::save_ota_firmware_image(&"./images".to_string(), &update_id, image)
-        .await
-        .unwrap();
-
-    // Get the file path
-    let file_path = format!("./images/{}/{}.bin", update_id, image.image_type);
-
-    log::info!("filepath {}", file_path);
-
-    // Check if the image is in place
-    assert!(Path::new(&file_path).exists());
-
-    // check to make sure the file exists int he correct folder.
-    assert!(std::path::Path::new(&file_path).exists());
 }
 
 #[tokio::test]
@@ -122,19 +79,19 @@ async fn get_ota_package_success() {
     let db = ota::init_trees(&db).unwrap();
 
     // Generate Update
-    let update = get_update(1, 0, 2, false);
+    let update = get_update(1, 0, 2);
 
     // Get update id
     let update_id = update.package.clone().unwrap().to_string();
 
-    // Test the save_ota_package
-    if let Err(e) = ota::save_ota_package(&db, &update).await {
+    // Test the save_ota_update
+    if let Err(e) = ota::save_ota_update(&db, &update).await {
         log::error!("Error: {}", e);
         assert!(false);
     }
 
     // Get OTA package
-    let package = match ota::get_ota_package(&db, &update_id) {
+    let fetched_update = match ota::get_ota_update(&db, &update_id) {
         Ok(p) => p,
         Err(e) => {
             log::error!("Error getting OTA package. Error: {}", e);
@@ -144,7 +101,10 @@ async fn get_ota_package_success() {
     };
 
     // Make sure everything is equal
-    assert_eq!(update.package.unwrap().version, package.version);
+    assert_eq!(
+        update.package.unwrap().version,
+        fetched_update.package.unwrap().version
+    );
 }
 
 #[tokio::test]
@@ -157,40 +117,16 @@ async fn delete_ota_package_success() {
     let db = ota::init_trees(&db).unwrap();
 
     // Generate Update
-    let update = get_update(1, 0, 3, false);
+    let update = get_update(1, 0, 3);
 
-    // Test the save_ota_package
-    ota::save_ota_package(&db, &update).await.unwrap();
+    // Test the save_ota_update
+    ota::save_ota_update(&db, &update).await.unwrap();
 
     // Generate the update ID
     let update_id = update.package.unwrap().to_string();
 
-    // Save all the appropriate images
-    for image in update.images.unwrap() {
-        // Save the image to disk
-        if let Err(e) =
-            ota::save_ota_firmware_image(&"./images/".to_string(), &update_id, &image).await
-        {
-            log::error!("Error: {}", e);
-            assert!(false);
-        }
-
-        let file_path = format!("./images/{}/{}.bin", update_id, image.image_type);
-
-        // Check if the image is in place
-        assert!(Path::new(&file_path).exists());
-    }
-
     // Delete the package
     ota::delete_ota_package(&db, &update_id).await.unwrap();
-
-    // Delete the image folder
-    ota::delete_ota_firmware_image(&"./images/".to_string(), &update_id)
-        .await
-        .unwrap();
-
-    // Check if the folder is gone
-    assert!(!Path::new(&format!("./images/{}/", &update_id)).exists());
 }
 
 #[tokio::test]
@@ -209,9 +145,6 @@ async fn delete_ota_package_failure() {
     // Delete the package
     let res = ota::delete_ota_package(&db, &update_id).await;
     assert!(res.is_ok());
-
-    let res = ota::delete_ota_firmware_image(&"./images/".to_string(), &update_id).await;
-    assert!(res.is_err());
 }
 
 #[tokio::test]
@@ -224,10 +157,8 @@ async fn test_ota_new_package_event() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Generate Update
-    let update = get_update(1, 1, 0, false);
+    let update = get_update(1, 1, 0);
 
     // Get update id
     let update_id = update.package.clone().unwrap().to_string();
@@ -239,21 +170,10 @@ async fn test_ota_new_package_event() {
     let event = Event::OtaNewPackage(update);
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // check if it's registered
-    assert!(ota::get_ota_package(&db, &update_id).is_ok());
-
-    // Get filepath
-    let file_path = format!(
-        "{}/{}/{}.bin",
-        settings.image_path,
-        update_id,
-        OTAImageType::Primary
-    );
-
-    // Check if it's saved to the filesystem
-    assert!(Path::new(&file_path).exists());
+    assert!(ota::get_ota_update(&db, &update_id).is_ok());
 }
 
 #[tokio::test]
@@ -266,8 +186,6 @@ async fn test_ota_request_check_event_not_found() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Get the sender/reciever associated with this particular task
     let (sender, receiver) = unbounded::<Event>();
 
@@ -276,12 +194,12 @@ async fn test_ota_request_check_event_not_found() {
         device_id: "1234".to_string(),
         msg: OtaRequest {
             cmd: OtaRequestCmd::Check,
-            version: Some(OtaVersion::V2),
+            ..Default::default()
         },
     };
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -289,15 +207,8 @@ async fn test_ota_request_check_event_not_found() {
     // Package should not be found
     match event {
         Event::OtaResponse(update) => {
-            // Make sure this is ok
-            assert!(update.v1.is_none());
-            assert!(update.v2.is_some());
-
-            let update = update.v2.unwrap();
-
-            assert_eq!(update.uid, Some("1234".to_string()));
+            assert_eq!(update.device_uid, Some("1234".to_string()));
             assert!(update.package.is_none());
-            assert!(update.images.is_none());
         }
         _ => {
             assert!(false, "Unexpected event!")
@@ -315,10 +226,8 @@ async fn test_ota_request_check_event_found() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Generate Update
-    let update = get_update(1, 1, 2, false);
+    let update = get_update(1, 1, 2);
 
     // Get update id
     let update_id = update.package.clone().unwrap().to_string();
@@ -330,40 +239,15 @@ async fn test_ota_request_check_event_found() {
     let event = Event::OtaNewPackage(update.clone());
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
-
-    // Get filepath
-    let file_path = format!(
-        "{}/{}/{}.bin",
-        settings.image_path,
-        update_id,
-        OTAImageType::Primary,
-    );
-
-    // Check if the file exists
-    assert!(Path::new(&file_path).exists());
+    ota::process_event(&sender, &db, &event).await;
 
     // Check to make sure the OTA package is there and is what's expected
-    let package = ota::get_ota_package(&db, &update_id);
-    assert!(package.is_ok());
+    let fetched_update = ota::get_ota_update(&db, &update_id);
+    assert!(fetched_update.is_ok());
 
     // Get the package
-    let package = package.unwrap();
-
-    assert_eq!(package.files.len(), 1);
-
-    assert_eq!(package.files[0].host, format!("https://{}", settings.url));
-
-    log::debug!(
-        "{} {}",
-        package.files[0].file,
-        format!(
-            "{}{}/{}.bin",
-            settings.image_path,
-            update_id,
-            OTAImageType::Primary
-        )
-    );
+    let fetched_update = fetched_update.unwrap();
+    let package = fetched_update.package.unwrap();
 
     assert_eq!(package.version, update.package.unwrap().version);
 }
@@ -378,10 +262,8 @@ async fn test_ota_request_check_seconary_found() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Generate Update
-    let update = get_update(1, 1, 2, true);
+    let update = get_update(1, 1, 2);
 
     // Get update id
     let update_id = update.package.clone().unwrap().to_string();
@@ -393,67 +275,22 @@ async fn test_ota_request_check_seconary_found() {
     let event = Event::OtaNewPackage(update.clone());
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
-
-    // Check if the primary exists
-    assert!(Path::new(&format!(
-        "{}/{}/{}.bin",
-        settings.image_path,
-        update_id,
-        OTAImageType::Primary,
-    ))
-    .exists());
-
-    // Check if the secondary exists
-    assert!(Path::new(&format!(
-        "{}/{}/{}.bin",
-        settings.image_path,
-        update_id,
-        OTAImageType::Secondary,
-    ))
-    .exists());
+    ota::process_event(&sender, &db, &event).await;
 
     // Check to make sure the OTA package is there and is what's expected
-    let package = ota::get_ota_package(&db, &update_id);
-    assert!(package.is_ok());
+    let fetched_update = ota::get_ota_update(&db, &update_id);
+    assert!(fetched_update.is_ok());
 
-    // Get the package
-    let package = package.unwrap();
-
-    assert_eq!(package.files.len(), 2);
-
-    assert_eq!(package.files[0].host, format!("https://{}", settings.url));
-
-    log::debug!(
-        "{} {}",
-        package.files[0].file,
-        format!(
-            "{}{}/{}.bin",
-            settings.image_path,
-            update_id,
-            OTAImageType::Primary,
-        )
-    );
-
-    assert_eq!(package.files[1].host, format!("https://{}", settings.url));
-
-    log::debug!(
-        "{} {}",
-        package.files[1].file,
-        format!(
-            "{}{}/{}.bin",
-            settings.image_path,
-            update_id,
-            OTAImageType::Secondary,
-        )
-    );
+    // Get the fetched_update
+    let fetched_update = fetched_update.unwrap();
+    let package = fetched_update.package.unwrap();
 
     assert_eq!(package.version, update.package.unwrap().version);
 }
 
 #[tokio::test]
 /// Checks to make sure there's a failure when trying to delete a non-existent file
-async fn test_ota_request_assign_an_check() {
+async fn test_ota_request_assign_and_check() {
     // Log setup
     setup();
 
@@ -461,10 +298,8 @@ async fn test_ota_request_assign_an_check() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Generate Update
-    let initial_update = get_update(1, 1, 2, false);
+    let initial_update = get_update(1, 1, 2);
 
     // Get update id
     let update_id = initial_update.package.clone().unwrap().to_string();
@@ -476,17 +311,16 @@ async fn test_ota_request_assign_an_check() {
     let event = Event::OtaNewPackage(initial_update.clone());
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Then assign the new image to a device
     let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
-        ota_version: 2.try_into().unwrap(),
     };
 
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -494,35 +328,16 @@ async fn test_ota_request_assign_an_check() {
     // Package should not be found
     match event {
         Event::OtaResponse(update) => {
-            assert!(update.v1.is_none());
-
-            // Then get the update
-            let update = update.v2.unwrap();
-
             // Make sure this is ok
-            assert_eq!(update.uid, Some("1234".to_string()));
+            assert_eq!(update.device_uid, Some("1234".to_string()));
             assert!(update.package.is_some());
-            assert!(update.images.is_none());
 
             // Confirm contents of package.
             let package = update.package.unwrap();
 
             assert_eq!(package.version, initial_update.package.unwrap().version);
 
-            assert_eq!(package.files.len(), 1);
-
-            assert_eq!(package.files[0].host, format!("https://{}", settings.url));
-
-            log::debug!(
-                "{} {}",
-                package.files[0].file,
-                format!(
-                    "{}{}/{}.bin",
-                    settings.image_path,
-                    update_id,
-                    OTAImageType::Primary,
-                )
-            );
+            log::debug!("{} - {}", update_id, OTAImageType::Primary);
         }
         _ => {
             assert!(false, "Unexpected event!")
@@ -540,8 +355,6 @@ async fn test_ota_request_empty_group_and_device_lists() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
-
     // Get the sender/reciever associated with this particular task
     let (sender, receiver) = unbounded::<Event>();
 
@@ -549,7 +362,7 @@ async fn test_ota_request_empty_group_and_device_lists() {
     let event = Event::OtaUpdateGroupListRequest();
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -568,7 +381,7 @@ async fn test_ota_request_empty_group_and_device_lists() {
     let event = Event::OtaUpdateImageListRequest();
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -594,9 +407,8 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
     // Generate Update
-    let initial_update = get_update(1, 1, 3, false);
+    let initial_update = get_update(1, 1, 3);
 
     // Get update id
     let update_id = initial_update.package.clone().unwrap().to_string();
@@ -608,17 +420,16 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     let event = Event::OtaNewPackage(initial_update.clone());
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Then assign the new image to a device
     let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
-        ota_version: 2.try_into().unwrap(),
     };
 
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     receiver.recv().unwrap();
@@ -627,7 +438,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     let event = Event::OtaUpdateGroupListRequest();
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -647,7 +458,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     let event = Event::OtaUpdateImageListRequest();
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     let event = receiver.recv().unwrap();
@@ -674,9 +485,8 @@ async fn test_ota_request_associate_and_dissociate() {
     let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
     let db = ota::init_trees(&db).unwrap();
 
-    let settings = get_default_settings();
     // Generate Update
-    let initial_update = get_update(1, 1, 3, false);
+    let initial_update = get_update(1, 1, 3);
 
     // Get update id
     let update_id = initial_update.package.clone().unwrap().to_string();
@@ -688,17 +498,16 @@ async fn test_ota_request_associate_and_dissociate() {
     let event = Event::OtaNewPackage(initial_update.clone());
 
     // Process
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Then assign the new image to a device
     let event = Event::OtaLink {
         device_id: Some("1234".to_string()),
         group_id: Some("1".to_string()),
         image_id: Some(update_id.clone()),
-        ota_version: 2.try_into().unwrap(),
     };
 
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     // Get the event sent.
     receiver.recv().unwrap();
@@ -709,7 +518,7 @@ async fn test_ota_request_associate_and_dissociate() {
         group_id: None,
     };
 
-    ota::process_event(&settings, &sender, &db, &event).await;
+    ota::process_event(&sender, &db, &event).await;
 
     assert!(db.devices.get(&"1234".to_string()).unwrap().is_none());
     assert!(db.groups.get(&"1".to_string()).unwrap().is_some());
