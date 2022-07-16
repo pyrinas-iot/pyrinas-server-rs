@@ -171,7 +171,7 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                                 }
                             };
 
-                            if data.end_pos > file.data.len() - 1 {
+                            if data.end_pos > file.data.len() {
                                 log::warn!(
                                     "Out of bounds! Start: {} End: {}",
                                     data.start_pos,

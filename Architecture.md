@@ -27,7 +27,7 @@ pub enum Event {
 
 Some of the most used events will be the `ApplicationRequest` and `ApplicationResponse` messages. These are generated when you send messages through MQTT to the server using the `app` topic. 
 
-For example, in the topic `<uid>/app/pub/data`, the server derives the uid, that it's an application message and that it's being published from a device with the target "data". All of this is sorted out in `mqtt.rs` in the `mqtt_run` function before it get's routed to the broker and then onto the application side of your code.
+For example, in the topic `<uid>/app/p/data`, the server derives the uid, that it's an application message and that it's being published from a device with the target "data". All of this is sorted out in `mqtt.rs` in the `mqtt_run` function before it get's routed to the broker and then onto the application side of your code.
 
 Currently the broker is implemented using unbounded `flume` channels. Every broker "client" needs to register using `Event::NewRunner` before beginning work. Here's an example:
 

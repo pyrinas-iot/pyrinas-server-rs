@@ -14,7 +14,7 @@ name = "pyrinas"
 path = "src/bin/example/cli.rs"
 
 [dependencies]
-pyrinas-shared = { version = "0.3.2", path = "../lib-shared/" }
+pyrinas-shared = { version = "0.5", path = "../lib-shared/" }
 pem = "1.0"
 rcgen = { version = "0.9", features = [
     "x509-parser",

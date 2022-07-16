@@ -2,7 +2,7 @@
 authors = ["Jared Wolff <hello@jaredwolff.com>"]
 edition = "2021"
 name = "pyrinas-shared"
-version = "0.3.2"
+version = "0.5.0"
 license = "Apache-2.0"
 description = "Shared files between Pyrinas CLI and Pyrinas Server."
 repository = "https://github.com/pyrinas-iot/pyrinas-server-rs"
@@ -12,7 +12,8 @@ keywords = ["ota", "mqtt", "iot"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing
-serde_repr = "0.1"
-clap = { version = "3.0", features = ["derive"] }  # CLI Library
-chrono = { version = "0.4", features = ["serde"] }
+minicbor = { version = "0.18.0", features = ["derive", "alloc"] } # Cbor
+serde = { version = "1.0", features = ["derive"] }                # Serializing/deserializing
+serde_repr = "0.1"                                                # Encoding enum as actual values
+clap = { version = "3.0", features = ["derive"] }                 # CLI Library
+chrono = { version = "0.4", features = ["serde"] }                # Time

@@ -171,7 +171,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                 let sub_topic = format!("{}/ota/s/d", device_uid);
 
                 // Encode
-                let res = serde_cbor::ser::to_vec_packed(&download).unwrap();
+                let res = minicbor::to_vec(&download).unwrap();
 
                 log::debug!("Publishing message to {}", &sub_topic);
 

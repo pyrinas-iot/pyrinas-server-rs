@@ -1,5 +1,7 @@
 use std::{fmt, str};
 
+use minicbor::{Decode, Encode};
+
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
@@ -43,18 +45,24 @@ pub struct OTAPackage {
 }
 
 // Struct that gets serialized for OTA support
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Encode, Decode, Serialize, Deserialize, Clone, Default)]
+#[cbor(map)]
 pub struct OTADownload {
     /// Start position
+    #[n(0)]
     pub start_pos: usize,
     /// End position
+    #[n(1)]
     pub end_pos: usize,
     /// Raw data download
+    #[cbor(n(2), with = "minicbor::bytes")]
     pub data: Vec<u8>,
     /// Length of data
+    #[n(3)]
     pub len: usize,
     /// Unique ID of the device this may get sent to
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[n(4)]
     pub device_uid: Option<String>,
 }
 

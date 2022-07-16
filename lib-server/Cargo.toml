@@ -15,7 +15,7 @@ use-native-tls = ["rumqttd/use-native-tls"]
 use-rustls = ["rumqttd/use-rustls"]
 
 [dependencies]
-pyrinas-shared = { version = "0.3", path = "../lib-shared/" }                                                   # Local shared for settings, etc 
+pyrinas-shared = { version = "0.5", path = "../lib-shared/" }                                                   # Local shared for settings, etc 
 clap = "3.0"                                                                                                    # CLI Library
 env_logger = "0.9"                                                                                              # logging message control using env variable
 influxdb = { version = "0.5", features = ["derive"] }                                                           # InfluxDB access 
@@ -23,6 +23,7 @@ log = "0.4"                                                                     
 rumqttd = { default-features = false, git = "https://github.com/jaredwolff/rumqtt.git", branch = "rsa-detect" } # Mqtt core bits
 serde = { version = "1.0", features = ["derive"] }                                                              # Serializing/deserializing 
 serde_cbor = "0.11"                                                                                             # Serde specific CBOR serialize/deserialze
+minicbor = { version = "0.18.0", features = ["derive", "alloc"] }                                               # Mincbor
 serde_json = "1.0"                                                                                              # Serializing/deserializing json
 sled = "0.34"                                                                                                   # Storing events as KV store
 flume = "0.10.2"                                                                                                # Channels
