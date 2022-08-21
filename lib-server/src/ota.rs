@@ -452,7 +452,7 @@ async fn dissociate_group(db: &OTADatabase, group_id: &str) -> Result<(), Error>
     Ok(())
 }
 
-async fn delete_all_ota_data(db: &OTADatabase) -> Result<(), Error> {
+pub async fn delete_all_ota_data(db: &OTADatabase) -> Result<(), Error> {
     // Clear them first
     db.images.clear()?;
     db.images.flush_async().await?;

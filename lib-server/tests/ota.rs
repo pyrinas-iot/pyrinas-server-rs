@@ -133,6 +133,32 @@ async fn delete_ota_package_success() {
 }
 
 #[tokio::test]
+async fn delete_all_ota_packages_success() {
+    // Log setup
+    setup();
+
+    // Creates temporary in-memory database
+    let db: sled::Db = sled::Config::new().temporary(true).open().unwrap();
+    let db = ota::init_trees(&db).unwrap();
+
+    // Generate Update
+    let update = get_update(1, 0, 3);
+
+    // Test the save_ota_update
+    ota::save_ota_update(&db, &update).await.unwrap();
+
+    // Delete the package
+    ota::delete_all_ota_data(&db).await.unwrap();
+
+    // Image shouldn't be there now..
+    let update_id = update.package.clone().unwrap().to_string();
+    assert!(ota::get_ota_update(&db, &update_id).is_err());
+
+    // save_ota_update again
+    ota::save_ota_update(&db, &update).await.unwrap();
+}
+
+#[tokio::test]
 /// Checks to make sure there's a failure when trying to delete a non-existent file
 async fn delete_ota_package_failure() {
     // Log setup
