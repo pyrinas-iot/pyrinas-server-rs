@@ -33,7 +33,7 @@ pub struct OtaRequest {
 }
 
 // Note: uses special _repr functions for using Enum as int
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy, Default)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum OtaRequestCmd {
     #[default]
@@ -42,7 +42,7 @@ pub enum OtaRequestCmd {
     DownloadBytes,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum ManagmentDataType {
     Application,
