@@ -42,7 +42,7 @@ jobs:
         # test a bunch of toolchains on ubuntu
         rust:
           - stable
-        os: [ubuntu-18.04]
+        os: [ubuntu-latest]
         # but only stable on macos/windows (slower platforms)
         include:
           - os: macos-latest
@@ -51,7 +51,7 @@ jobs:
             rust: stable
     steps:
       - name: Install libudev
-        if: matrix.os == 'ubuntu-18.04'
+        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
 
       - name: Checkout sources
@@ -75,7 +75,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Install libudev
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
@@ -99,7 +99,7 @@ jobs:
 
   coverage:
     name: Measure coverage
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Install libudev
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
