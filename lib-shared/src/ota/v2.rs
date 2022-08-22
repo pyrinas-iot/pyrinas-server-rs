@@ -72,7 +72,7 @@ impl fmt::Display for OTAPackage {
     }
 }
 
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone, Copy)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum OTAImageType {
     /// This is a main firmware image
