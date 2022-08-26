@@ -4,7 +4,9 @@ use flume::{unbounded, Sender};
 // Local lib related
 use crate::{settings, Event};
 use pyrinas_shared::ota::v2::{OTADownload, OTAUpdate};
-use pyrinas_shared::{OtaGroupListResponse, OtaImageListResponse, OtaRequestCmd};
+use pyrinas_shared::{
+    OtaGroupListResponse, OtaImageListResponse, OtaImageListResponseEntry, OtaRequestCmd,
+};
 
 // Error
 use crate::Error;
@@ -30,7 +32,10 @@ pub fn get_ota_update(db: &OTADatabase, update_id: &str) -> Result<OTAUpdate, Er
     };
 
     // Deserialize it
-    let package: OTAUpdate = serde_cbor::de::from_slice(&entry)?;
+    let package: OTAUpdate = match minicbor::decode(&entry) {
+        Ok(p) => p,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
     Ok(package)
 }
 
@@ -60,7 +65,10 @@ fn get_ota_update_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAU
 
     // Check if there's a package available and ready
     let update: OTAUpdate = match db.images.get(&image_id)? {
-        Some(e) => serde_cbor::from_slice(&e)?,
+        Some(e) => match minicbor::decode(&e) {
+            Ok(u) => u,
+            Err(e) => return Err(Error::CborError(e.to_string())),
+        },
         None => {
             return Err(Error::CustomError("No data available.".to_string()));
         }
@@ -360,13 +368,13 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                 let (k, v) = image;
 
                 // Deserialize
-                let key = match String::from_utf8(k.to_vec()) {
+                let name = match String::from_utf8(k.to_vec()) {
                     Ok(k) => k,
                     Err(_) => continue,
                 };
 
                 // Deserialize
-                let value: OTAUpdate = match serde_cbor::from_slice(&v) {
+                let value: OTAUpdate = match minicbor::decode(&v) {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
@@ -377,7 +385,9 @@ pub async fn process_event(broker_sender: &Sender<Event>, db: &OTADatabase, even
                 };
 
                 // Add the image
-                response.images.push((key, package));
+                response
+                    .images
+                    .push(OtaImageListResponseEntry { name, package });
             }
 
             // Notify mqtt to send update!
@@ -496,7 +506,10 @@ pub async fn save_ota_update(db: &OTADatabase, update: &OTAUpdate) -> Result<(),
     };
 
     // Turn entry.package into CBOR
-    let cbor_data = serde_cbor::ser::to_vec_packed(&update)?;
+    let cbor_data = match minicbor::to_vec(&update) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Check if insert worked ok
     db.images.insert(&package.to_string(), cbor_data)?;

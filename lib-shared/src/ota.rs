@@ -2,15 +2,21 @@ pub mod v2;
 
 use std::{fmt, str};
 
-use serde::{Deserialize, Serialize};
+use minicbor::{Decode, Encode};
 
 /// Struct that gets serialized for OTA support
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Encode, Decode, Clone, Eq, PartialEq)]
+#[cbor(map)]
 pub struct OTAPackageVersion {
+    #[n(0)]
     pub major: u8,
+    #[n(1)]
     pub minor: u8,
+    #[n(2)]
     pub patch: u8,
+    #[n(3)]
     pub commit: u8,
+    #[n(4)]
     pub hash: [u8; 8],
 }
 

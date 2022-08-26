@@ -37,7 +37,7 @@ fn get_update(major: u8, minor: u8, patch: u8) -> OTAUpdate {
             image_type: OTAImageType::Primary,
         }),
         size: image.len(),
-        date_added: Utc::now(),
+        date_added: Utc::now().to_string(),
     };
 
     // Update
@@ -496,7 +496,7 @@ async fn test_ota_request_associate_device_image_group_and_get_group_list_and_im
     match event {
         Event::OtaUpdateImageListRequestResponse(r) => {
             assert_eq!(r.images.len(), 1);
-            assert_eq!(r.images[0].0, update_id);
+            assert_eq!(r.images[0].name, update_id);
         }
         _ => {
             assert!(false, "Unexpected event!")

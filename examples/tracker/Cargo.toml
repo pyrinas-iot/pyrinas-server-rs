@@ -23,6 +23,8 @@ influxdb = { version = "0.5", features = ["derive"] } # InfluxDB access
 chrono = { version = "0.4", features = ["serde"] }    # Tracking time
 
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
-serde_cbor = "0.11"                                # Serde specific CBOR serialize/deserialze
-serde_json = "1.0"                                 # Serde specific for JSON
-serde_with = "1.9"                                 # Serde for timstamps
+minicbor = { version = "0.18.0", features = [
+    "derive",
+    "alloc",
+] } # Specific CBOR serialize/deserialze
+serde_json = "1.0" # Serde specific for JSON

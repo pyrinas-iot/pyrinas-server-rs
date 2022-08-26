@@ -15,9 +15,6 @@ use crate::settings;
 use crate::Event;
 use pyrinas_shared::ManagmentDataType;
 
-// Cbor
-use serde_cbor;
-
 // Error
 use crate::Error;
 
@@ -97,14 +94,14 @@ async fn handle_connection(
 
         // First deocde into ManagementRequest struct
         let req: pyrinas_shared::ManagementData =
-            serde_cbor::from_slice(&data).expect("Unable to deserialize ManagementData");
+            minicbor::decode(&data).expect("Unable to deserialize ManagementData");
 
         // Next step in the managment request process
         match req.cmd {
             ManagmentDataType::AddOta => {
                 // Dedcode ota update
                 let ota_update: pyrinas_shared::ota::v2::OTAUpdate =
-                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaUpdate");
+                    minicbor::decode(&req.msg).expect("Unable to deserialize OtaUpdate");
 
                 // Send if decode was successful
                 broker_sender
@@ -115,7 +112,7 @@ async fn handle_connection(
             ManagmentDataType::LinkOta => {
                 // Dedcode ota update
                 let a: pyrinas_shared::OtaLink =
-                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
+                    minicbor::decode(&req.msg).expect("Unable to deserialize OtaLink");
 
                 // Send if decode was successful
                 broker_sender
@@ -153,7 +150,7 @@ async fn handle_connection(
             ManagmentDataType::UnlinkOta => {
                 // Dedcode ota update
                 let a: pyrinas_shared::OtaLink =
-                    serde_cbor::from_slice(&req.msg).expect("Unable to deserialize OtaLink");
+                    minicbor::decode(&req.msg).expect("Unable to deserialize OtaLink");
 
                 // Send if decode was successful
                 broker_sender
@@ -206,21 +203,21 @@ pub async fn run(settings: &settings::Admin, broker_sender: Sender<Event>) -> Re
             log::info!("{:?}", event);
 
             let data = match event {
-                Event::OtaUpdateImageListRequestResponse(r) => match serde_cbor::to_vec(&r) {
+                Event::OtaUpdateImageListRequestResponse(r) => match minicbor::to_vec(&r) {
                     Ok(v) => v,
                     Err(_) => {
                         log::warn!("Unable to serialize image list!");
                         continue;
                     }
                 },
-                Event::OtaUpdateGroupListRequestResponse(r) => match serde_cbor::to_vec(&r) {
+                Event::OtaUpdateGroupListRequestResponse(r) => match minicbor::to_vec(&r) {
                     Ok(v) => v,
                     Err(_) => {
                         log::warn!("Unable to serialize group list!");
                         continue;
                     }
                 },
-                Event::ApplicationManagementResponse(r) => match serde_cbor::to_vec(&r) {
+                Event::ApplicationManagementResponse(r) => match minicbor::to_vec(&r) {
                     Ok(v) => v,
                     Err(_) => {
                         log::warn!("Unable to application management response!");

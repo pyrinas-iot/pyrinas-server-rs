@@ -213,7 +213,7 @@ pub enum ConfigSubCommand {
 pub struct Show {}
 
 // Struct that gets serialized for OTA support
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct OTAManifest {
     pub version: OTAPackageVersion,
     pub file: String,

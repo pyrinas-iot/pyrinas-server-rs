@@ -32,7 +32,7 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                 "gps" => {
                     // Handle deserialization of CBOR
                     let payload: crate::structures::data::TrackerGpsReport =
-                        match serde_cbor::from_slice(&req.msg) {
+                        match minicbor::decode(&req.msg) {
                             Ok(p) => p,
                             Err(e) => {
                                 log::error!("Unable to deserialize data! Err: {}", e);
@@ -56,7 +56,7 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                 "boot" => {
                     // Handle deserialization of CBOR
                     let payload: crate::structures::data::TrackerDeviceReport =
-                        match serde_cbor::from_slice(&req.msg) {
+                        match minicbor::decode(&req.msg) {
                             Ok(p) => p,
                             Err(e) => {
                                 log::error!("Unable to deserialize data! Err: {}", e);
@@ -80,7 +80,7 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
                 "motion" => {
                     // Handle deserialization of CBOR
                     let payload: crate::structures::data::TrackerAccelReport =
-                        match serde_cbor::from_slice(&req.msg) {
+                        match minicbor::decode(&req.msg) {
                             Ok(p) => p,
                             Err(e) => {
                                 log::error!("Unable to deserialize data! Err: {}", e);

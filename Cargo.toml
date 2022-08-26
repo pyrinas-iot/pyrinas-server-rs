@@ -1,10 +1,2 @@
 [workspace]
-members = [
-    "lib-cli",
-    "lib-server",
-    "lib-shared",
-    "lib-codec-example",
-    "examples/server",
-    "examples/client",
-    "examples/tracker",
-]
+members = ["lib-cli", "lib-server", "lib-shared"]

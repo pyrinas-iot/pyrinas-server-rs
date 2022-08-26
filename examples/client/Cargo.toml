@@ -16,5 +16,5 @@ rumqttc = { git = "https://github.com/jaredwolff/rumqtt.git", branch = "rsa-dete
 clap = "3.0"                # CLI Library
 tokio = { version = "1.0" } # async runtime
 
-serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
-serde_cbor = "0.11"                                # Serde specific CBOR serialize/deserialze
+serde = { version = "1.0", features = ["derive"] }                # Serializing/deserializing 
+minicbor = { version = "0.18.0", features = ["derive", "alloc"] }

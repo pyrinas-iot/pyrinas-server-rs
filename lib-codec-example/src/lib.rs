@@ -5,8 +5,6 @@
 extern crate panic_halt;
 
 use serde::{Deserialize, Serialize};
-use serde_cbor::ser::SliceWrite;
-use serde_cbor::Serializer;
 
 /// Respnse of the encode function.
 /// Includes the raw bytes that can then be

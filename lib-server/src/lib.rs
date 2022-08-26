@@ -51,11 +51,8 @@ pub enum Error {
         source: librumqttd::async_locallink::LinkError,
     },
 
-    #[error("{source}")]
-    CborError {
-        #[from]
-        source: serde_cbor::Error,
-    },
+    #[error("err: {0}")]
+    CborError(String),
 
     #[error("{source}")]
     SledError {

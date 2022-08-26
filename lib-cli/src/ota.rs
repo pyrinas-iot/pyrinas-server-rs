@@ -1,4 +1,4 @@
-use chrono::{Duration, Local, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 
 // Pyrinas
 use pyrinas_shared::ota::v2::{OTAImageData, OTAImageType, OTAPackage, OTAUpdate};
@@ -7,7 +7,7 @@ use pyrinas_shared::{
 };
 
 // Cbor
-use serde_cbor;
+use minicbor;
 
 // Std lib
 use std::fs::File;
@@ -30,12 +30,8 @@ pub enum Error {
         source: io::Error,
     },
 
-    /// Serde CBOR error
-    #[error("serde_cbor error: {source}")]
-    CborError {
-        #[from]
-        source: serde_cbor::Error,
-    },
+    #[error("err: {0}")]
+    CborError(String),
 
     /// Websocket error
     #[error("websocket error: {source}")]
@@ -124,7 +120,7 @@ pub fn process(
                             }
                         };
 
-                        let list: OtaGroupListResponse = match serde_cbor::from_slice(&data) {
+                        let list: OtaGroupListResponse = match minicbor::decode(&data) {
                             Ok(m) => m,
                             Err(e) => {
                                 eprintln!("Unable to get image list! Error: {}", e);
@@ -165,7 +161,7 @@ pub fn process(
                             }
                         };
 
-                        let list: OtaImageListResponse = match serde_cbor::from_slice(&data) {
+                        let list: OtaImageListResponse = match minicbor::decode(&data) {
                             Ok(m) => m,
                             Err(e) => {
                                 eprintln!("Unable to get image list! Error: {}", e);
@@ -173,12 +169,14 @@ pub fn process(
                             }
                         };
 
-                        for (name, package) in list.images.iter() {
-                            // Get the date
-                            let date = package.date_added.with_timezone(&Local).to_string();
+                        for image in list.images.iter() {
+                            let date_added =
+                                DateTime::parse_from_rfc2822(&image.package.date_added)
+                                    .unwrap()
+                                    .with_timezone(&Local);
 
                             // Print out the entry
-                            println!("{} {}", name, date);
+                            println!("{} {}", image.name, date_added);
                         }
 
                         break;
@@ -250,12 +248,15 @@ pub fn add_ota(
                 image_type: OTAImageType::Primary,
             }),
             size,
-            date_added: Utc::now(),
+            date_added: Utc::now().to_string().to_string(),
         }),
     };
 
     // Serialize to cbor
-    let data = serde_cbor::to_vec(&new)?;
+    let data = match minicbor::to_vec(&new) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Then configure the outer data
     let msg = ManagementData {
@@ -265,7 +266,10 @@ pub fn add_ota(
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -281,11 +285,17 @@ pub fn unlink(
     let msg = ManagementData {
         cmd: ManagmentDataType::UnlinkOta,
         target: None,
-        msg: serde_cbor::to_vec(link)?,
+        msg: match minicbor::to_vec(link) {
+            Ok(u) => u,
+            Err(e) => return Err(Error::CborError(e.to_string())),
+        },
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -301,11 +311,17 @@ pub fn link(
     let msg = ManagementData {
         cmd: ManagmentDataType::LinkOta,
         target: None,
-        msg: serde_cbor::to_vec(link)?,
+        msg: match minicbor::to_vec(link) {
+            Ok(u) => u,
+            Err(e) => return Err(Error::CborError(e.to_string())),
+        },
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -326,7 +342,10 @@ pub fn remove_ota(
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -343,7 +362,10 @@ pub fn get_ota_group_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> 
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -360,7 +382,10 @@ pub fn get_ota_image_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> 
     };
 
     // If second encode looks good send it off
-    let data = serde_cbor::to_vec(&msg)?;
+    let data = match minicbor::to_vec(&msg) {
+        Ok(u) => u,
+        Err(e) => return Err(Error::CborError(e.to_string())),
+    };
 
     // Send over socket
     stream.write_message(Message::binary(data))?;

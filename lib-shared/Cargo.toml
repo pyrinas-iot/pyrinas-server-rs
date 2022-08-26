@@ -13,7 +13,4 @@ keywords = ["ota", "mqtt", "iot"]
 
 [dependencies]
 minicbor = { version = "0.18.0", features = ["derive", "alloc"] } # Cbor
-serde = { version = "1.0", features = ["derive"] }                # Serializing/deserializing
-serde_repr = "0.1"                                                # Encoding enum as actual values
 clap = { version = "3.0", features = ["derive"] }                 # CLI Library
-chrono = { version = "0.4", features = ["serde"] }                # Time

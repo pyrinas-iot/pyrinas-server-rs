@@ -61,8 +61,8 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
             match event_type {
                 "ota" => {
                     // Get the telemetry data
-                    let res: Result<pyrinas_shared::OtaRequest, serde_cbor::error::Error> =
-                        serde_cbor::from_slice(&payload);
+                    let res: Result<pyrinas_shared::OtaRequest, minicbor::decode::Error> =
+                        minicbor::decode(&payload);
 
                     // Match function to handle error
                     match res {
@@ -83,8 +83,8 @@ pub async fn mqtt_run(rx: &mut AsyncLinkRx, broker_sender: Sender<Event>) {
                 }
                 "tel" => {
                     // Get the telemetry data
-                    let res: Result<telemetry::TelemetryData, serde_cbor::error::Error> =
-                        serde_cbor::from_slice(&payload);
+                    let res: Result<telemetry::TelemetryData, minicbor::decode::Error> =
+                        minicbor::decode(&payload);
 
                     // Match function to handle error
                     match res {
@@ -192,7 +192,7 @@ pub async fn run(tx: &mut AsyncLinkTx, broker_sender: Sender<Event>) {
                         Some(mut p) => {
                             log::debug!("{:?}", p);
                             p.file = None;
-                            serde_cbor::ser::to_vec_packed(&p).unwrap()
+                            minicbor::to_vec(&p).unwrap()
                         }
                         None => Vec::new(),
                     };

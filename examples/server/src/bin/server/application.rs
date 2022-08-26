@@ -27,7 +27,7 @@ pub async fn run(_settings: Arc<PyrinasSettings>, broker_sender: Sender<Event>) 
         if let Event::ApplicationRequest(req) = event {
             if req.target.as_str() == "env" {
                 // Deserialize data from MQTT clients
-                let msg: EnvironmentData = match serde_cbor::from_slice(&req.msg) {
+                let msg: EnvironmentData = match minicbor::decode(&req.msg) {
                     Ok(m) => m,
                     Err(e) => {
                         log::warn!("Unable to deserialize from MQTT message. Err: {}", e);

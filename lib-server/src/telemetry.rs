@@ -1,15 +1,20 @@
 use chrono::{DateTime, Utc};
 use influxdb::{InfluxDbWriteable, WriteQuery};
-use serde::{Deserialize, Serialize};
+use minicbor::{Decode, Encode};
 
 // TODO: confirm the name works for each
 // Matches `pyrinas_cloud_telemetry_type_t` in `pyrinas_cloud.h`
 // Note: the enum indexes match the entry order below. i.e. the order counts!
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Encode, Decode, Clone)]
+#[cbor(map)]
 pub struct TelemetryData {
+    #[n(0)]
     version: Option<String>,
-    rsrp: Option<u32>,        // Won't always have rsrp (hub only)
-    rssi_hub: Option<i32>,    // Won't always have this guy either
+    #[n(1)]
+    rsrp: Option<u32>, // Won't always have rsrp (hub only)
+    #[n(2)]
+    rssi_hub: Option<i32>, // Won't always have this guy either
+    #[n(3)]
     rssi_client: Option<i32>, // Won't always have this guy either
 }
 
