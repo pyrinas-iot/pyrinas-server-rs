@@ -10,6 +10,7 @@ use pyrinas_shared::{
 use minicbor;
 
 // Std lib
+use std::convert::Infallible;
 use std::fs::File;
 use std::io::{self, prelude::*};
 use std::net::TcpStream;
@@ -30,8 +31,17 @@ pub enum Error {
         source: io::Error,
     },
 
-    #[error("err: {0}")]
-    CborError(String),
+    #[error("{source}")]
+    CborDecodeError {
+        #[from]
+        source: minicbor::decode::Error,
+    },
+
+    #[error("{source}")]
+    CborEncodeError {
+        #[from]
+        source: minicbor::encode::Error<Infallible>,
+    },
 
     /// Websocket error
     #[error("websocket error: {source}")]
@@ -120,13 +130,7 @@ pub fn process(
                             }
                         };
 
-                        let list: OtaGroupListResponse = match minicbor::decode(&data) {
-                            Ok(m) => m,
-                            Err(e) => {
-                                eprintln!("Unable to get image list! Error: {}", e);
-                                break;
-                            }
-                        };
+                        let list: OtaGroupListResponse = minicbor::decode(&data)?;
 
                         for name in list.groups.iter() {
                             // Print out the entry
@@ -161,13 +165,7 @@ pub fn process(
                             }
                         };
 
-                        let list: OtaImageListResponse = match minicbor::decode(&data) {
-                            Ok(m) => m,
-                            Err(e) => {
-                                eprintln!("Unable to get image list! Error: {}", e);
-                                break;
-                            }
-                        };
+                        let list: OtaImageListResponse = minicbor::decode(&data)?;
 
                         for image in list.images.iter() {
                             let date_added =
@@ -253,10 +251,7 @@ pub fn add_ota(
     };
 
     // Serialize to cbor
-    let data = match minicbor::to_vec(&new) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&new)?;
 
     // Then configure the outer data
     let msg = ManagementData {
@@ -266,10 +261,7 @@ pub fn add_ota(
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -285,17 +277,11 @@ pub fn unlink(
     let msg = ManagementData {
         cmd: ManagmentDataType::UnlinkOta,
         target: None,
-        msg: match minicbor::to_vec(link) {
-            Ok(u) => u,
-            Err(e) => return Err(Error::CborError(e.to_string())),
-        },
+        msg: minicbor::to_vec(link)?,
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -311,17 +297,11 @@ pub fn link(
     let msg = ManagementData {
         cmd: ManagmentDataType::LinkOta,
         target: None,
-        msg: match minicbor::to_vec(link) {
-            Ok(u) => u,
-            Err(e) => return Err(Error::CborError(e.to_string())),
-        },
+        msg: minicbor::to_vec(link)?,
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -342,10 +322,7 @@ pub fn remove_ota(
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -362,10 +339,7 @@ pub fn get_ota_group_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> 
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;
@@ -382,10 +356,7 @@ pub fn get_ota_image_list(stream: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> 
     };
 
     // If second encode looks good send it off
-    let data = match minicbor::to_vec(&msg) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let data = minicbor::to_vec(&msg)?;
 
     // Send over socket
     stream.write_message(Message::binary(data))?;

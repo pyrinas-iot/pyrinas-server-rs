@@ -32,10 +32,7 @@ pub fn get_ota_update(db: &OTADatabase, update_id: &str) -> Result<OTAUpdate, Er
     };
 
     // Deserialize it
-    let package: OTAUpdate = match minicbor::decode(&entry) {
-        Ok(p) => p,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let package: OTAUpdate = minicbor::decode(&entry)?;
     Ok(package)
 }
 
@@ -65,10 +62,7 @@ fn get_ota_update_by_device_id(db: &OTADatabase, device_id: &str) -> Result<OTAU
 
     // Check if there's a package available and ready
     let update: OTAUpdate = match db.images.get(&image_id)? {
-        Some(e) => match minicbor::decode(&e) {
-            Ok(u) => u,
-            Err(e) => return Err(Error::CborError(e.to_string())),
-        },
+        Some(e) => minicbor::decode(&e)?,
         None => {
             return Err(Error::CustomError("No data available.".to_string()));
         }
@@ -506,10 +500,7 @@ pub async fn save_ota_update(db: &OTADatabase, update: &OTAUpdate) -> Result<(),
     };
 
     // Turn entry.package into CBOR
-    let cbor_data = match minicbor::to_vec(&update) {
-        Ok(u) => u,
-        Err(e) => return Err(Error::CborError(e.to_string())),
-    };
+    let cbor_data = minicbor::to_vec(&update)?;
 
     // Check if insert worked ok
     db.images.insert(&package.to_string(), cbor_data)?;

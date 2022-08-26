@@ -29,6 +29,7 @@ serde_json = "^1.0" # For serialization of json
 minicbor = { version = "0.18.0", features = [
     "derive",
     "alloc",
+    "std",
 ] } # Specific CBOR serialize/deserialze
 thiserror = "1.0" # Error handling
 home = "0.5.3" # Get home directory 

@@ -15,7 +15,7 @@ use influxdb::{ReadQuery, WriteQuery};
 // Async Related
 use flume::{Receiver, Sender};
 use pyrinas_shared::ota::v2::{OTADownload, OTAUpdate};
-use std::{io, sync::Arc};
+use std::{io, sync::Arc, convert::Infallible};
 
 // Runtime
 use tokio::task;
@@ -51,8 +51,17 @@ pub enum Error {
         source: librumqttd::async_locallink::LinkError,
     },
 
-    #[error("err: {0}")]
-    CborError(String),
+    #[error("{source}")]
+    CborDecodeError {
+        #[from]
+        source: minicbor::decode::Error,
+    },
+
+    #[error("{source}")]
+    CborEncodeError {
+        #[from]
+        source: minicbor::encode::Error<Infallible>,
+    },
 
     #[error("{source}")]
     SledError {
