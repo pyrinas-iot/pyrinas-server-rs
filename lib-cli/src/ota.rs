@@ -246,7 +246,7 @@ pub fn add_ota(
                 image_type: OTAImageType::Primary,
             }),
             size,
-            date_added: Utc::now().to_string().to_string(),
+            date_added: Utc::now().to_string(),
         }),
     };
 

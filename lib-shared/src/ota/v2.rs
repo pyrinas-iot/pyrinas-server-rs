@@ -21,6 +21,7 @@ pub struct OTAPackage {
     #[n(3)]
     pub size: usize,
     /// Timestamp for tracking when this was added
+    /// TODO: to NativeDateTime
     #[n(4)]
     pub date_added: String,
 }
