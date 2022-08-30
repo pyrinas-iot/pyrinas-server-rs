@@ -23,8 +23,10 @@ influxdb = { version = "0.5", features = ["derive"] } # InfluxDB access
 chrono = { version = "0.4", features = ["serde"] }    # Tracking time
 
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
-minicbor = { version = "0.18.0", features = [
+minicbor = { git = "https://gitlab.com/jaredwolff/minicbor.git", branch = "add_naivedatetime_encode_decode", features = [
     "derive",
     "alloc",
-] } # Specific CBOR serialize/deserialze
+    "std",
+    "time",
+] }
 serde_json = "1.0" # Serde specific for JSON

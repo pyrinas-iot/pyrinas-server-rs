@@ -19,7 +19,9 @@ tokio = { version = "1.0" } # async runtime
 log = "0.4"                 # logging messages
 
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing 
-minicbor = { version = "0.18.0", features = [
+minicbor = { git = "https://gitlab.com/jaredwolff/minicbor.git", branch = "add_naivedatetime_encode_decode", features = [
     "derive",
     "alloc",
-] } # Specific CBOR serialize/deserialze
+    "std",
+    "time",
+] }

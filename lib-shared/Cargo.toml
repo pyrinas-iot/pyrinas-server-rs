@@ -12,5 +12,10 @@ keywords = ["ota", "mqtt", "iot"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-minicbor = { version = "0.18.0", features = ["derive", "alloc"] } # Cbor
-clap = { version = "3.0", features = ["derive"] }                 # CLI Library
+minicbor = { git = "https://gitlab.com/jaredwolff/minicbor.git", branch = "add_naivedatetime_encode_decode", features = [
+    "derive",
+    "alloc",
+    "std",
+    "time",
+] }
+clap = { version = "3.0", features = ["derive"] } # CLI Library

@@ -22,10 +22,12 @@ influxdb = { version = "0.5", features = ["derive"] } # InfluxDB access
 log = "0.4" # logging messages
 rumqttd = { default-features = false, git = "https://github.com/jaredwolff/rumqtt.git", branch = "rsa-detect" } # Mqtt core bits
 serde = { version = "1.0", features = ["derive"] } # Serializing/deserializing
-minicbor = { version = "0.18.0", features = [
+minicbor = { git = "https://gitlab.com/jaredwolff/minicbor.git", branch = "add_naivedatetime_encode_decode", features = [
     "derive",
     "alloc",
-] } # Serde specific CBOR serialize/deserialze
+    "std",
+    "time",
+] }
 sled = "0.34" # Storing events as KV store
 flume = "0.10.2" # Channels
 cfg-if = "1.0.0" # Macro config
