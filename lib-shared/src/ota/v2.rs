@@ -79,7 +79,7 @@ impl fmt::Display for OTAImageType {
 #[derive(Encode, Decode, Debug, Clone)]
 #[cbor(map)]
 pub struct OTAImageData {
-    #[cbor(n(0), with = "minicbor::bytes")]
+    #[n(0)]
     pub data: Vec<u8>,
     #[n(1)]
     pub image_type: OTAImageType,

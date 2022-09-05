@@ -86,7 +86,7 @@ pub struct ManagementData {
     pub cmd: ManagmentDataType,
     #[n(1)]
     pub target: Option<String>,
-    #[cbor(n(2), with = "minicbor::bytes")]
+    #[n(2)]
     pub msg: Vec<u8>,
 }
 
